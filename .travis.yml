@@ -1,5 +1,11 @@
 language: python
 
-install: pip install --user .
+python:
+ - 2.7
 
-script: pytest ufload
+install:
+ - pip install .
+ - pip install pytest
+
+script:
+ - py.test ufload
