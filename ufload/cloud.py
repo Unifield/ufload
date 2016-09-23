@@ -3,8 +3,10 @@
 import easywebdav
 import datetime, time
 import zipfile
-import ufload
+import collections
 import logging, re
+
+import ufload
 
 def _splitCloudName(x):
     spl = x.split(":", 1)
@@ -40,7 +42,7 @@ def _get_all_files_and_timestamp(dav, d):
         if f.name.split(".")[-1] != "zip":
             logging.warn("Ignoring non-zipfile: %s" % f.name)
             continue
-        ret.append((fn, t))
+        ret.append((t, f.name))
     return ret
 
 def _lookInsideZip(f, dav):
@@ -51,11 +53,9 @@ def _lookInsideZip(f, dav):
     names = z.namelist()
     if len(names) != 1:
         logging.warn("Zipfile %s has unexpected files in it: %s" % (fn, names))
-#    if len(names) > 0:
-#        ret.append(names[0])
+    if len(names) > 0:
+        ret.append(names[0])
     z.close()
-
-#    ufload.progress("Read %s" % fn)
 
 # returns True if x is matched by the pattern in instance
 def _match_instance_name(instance, x):
@@ -73,26 +73,45 @@ def _match_any_wildcard(instances, x):
             return True
     return False
 
+def _group_files_to_download(files):
+    files.sort()
+    files.reverse()
+    ret = collections.defaultdict(lambda : [])
+
+    for a in files:
+        t, f = a
+        if '/' not in f:
+            raise Exception("no slash in %s" % f)
+
+        isplit = f.rindex('/')
+        filename = f[isplit+1:]
+        if '-' not in filename:
+            print "unexpected filename:", filename
+            continue
+
+        instance = '-'.join(filename.split('-')[:-1])
+        ret[instance].append((f, filename))
+
+    return ret
+
+# list_files returns a dictionary of instances
+# and for each instance, a list of (path,file) tuples
+# in order from new to old.
 def list_files(**kwargs):
     host, directory = _splitCloudName(kwargs['where'])
     webdav = easywebdav.connect(host,
                             username=kwargs['user'],
                             password=kwargs['pw'],
                             protocol='https')
-    x = _get_all_files_and_timestamp(webdav, "/remote.php/webdav/"+directory)
+    all = _get_all_files_and_timestamp(webdav, "/remote.php/webdav/"+directory)
+    all = _group_files_to_download(all)
 
-    # add a % on the end of instances, since we are matching filenames
-    # here
     inst = []
     if kwargs['instances'] is not None:
-        for i in kwargs['instances']:
-            if i[-1] != "%":
-                inst.append(i+"%")
-            else:
-                inst.append(i)
+        inst = kwargs['instances']
 
-    ret = []
-    for f,t in x:
-        if _match_any_wildcard(inst, f):
-            ret.append(f)
+    ret = {}
+    for i in all:
+        if _match_any_wildcard(inst, i):
+            ret[i] = all[i]
     return ret
