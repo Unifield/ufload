@@ -59,8 +59,8 @@ def main():
 
     # read from $HOME/.ufload first
     conffile = ConfigParser.SafeConfigParser()
-    conffile.read('%s/.ufload' % os.environ['HOME'])
-    for subp, subn in ((parser, "global"), (pLs, "ls")):
+    conffile.read('%s/.ufload' % home())
+    for subp, subn in ((parser, "owncloud"), (pLs, "ls")):
         if conffile.has_section(subn):
             subp.set_defaults(**dict(conffile.items(subn)))
 
@@ -68,3 +68,8 @@ def main():
     args = parser.parse_args()
     if hasattr(args, "func"):
         sys.exit(args.func(args))
+
+def home():
+    if sys.platform == "win32" and 'USERPROFILE' in os.environ:
+        return os.environ['USERPROFILE']
+    return os.environ['HOME']
