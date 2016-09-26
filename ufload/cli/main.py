@@ -1,5 +1,6 @@
 import ConfigParser, argparse, os, sys
 import subprocess
+import binascii
 
 import ufload
 
@@ -48,13 +49,14 @@ def psql(args):
     return [ find_exe('psql') ] + pg_common(args)
 
 # Returns a list with the arguments for pg_restore
-def _restore_file(args, db, file):
+def _restore_file(args, db):
     res = pg_restore(args)
     res.append('--no-acl')
     res.append('--no-owner')
     res.append('-d')
     res.append(db)
-    res.append(file)
+    res.append('-n')
+    res.append('public')
     return res
 
 def _drop_db(args, db):
@@ -74,7 +76,12 @@ def _create_db(args, db):
     return cmd
 
 def _progress(p):
-    print >> sys.stderr, p
+    if len(p)>0 and p[0] == "\r":
+        # No \n please.
+        sys.stderr.write(p)
+    else:
+        print >> sys.stderr, p
+
 ufload.progress = _progress
 
 def _ocToDir(oc):
@@ -126,6 +133,9 @@ def _cmdRestore(args):
             if len(args.i) != 1:
                 print "Expected only one -i argument."
                 return 3
+            if "%" in args.i[0]:
+                print "Wildcards not allowed when using -i to set the database."
+                return 3
             db = args.i[0]
         else:
             db = _find_instance(args.file)
@@ -133,18 +143,84 @@ def _cmdRestore(args):
                 print "Could not guess instance from filename. Use -i to specify it."
                 return 3
 
+        ufload.progress("Drop database "+db)
         rc = _run(args, _drop_db(args, db))
         if rc != 0:
             return rc
+
+        ufload.progress("Create database "+db)
         rc = _run(args, _create_db(args, db))
         if rc != 0:
             return rc
-        cmd = _restore_file(args, db, args.file)
-        return _run(args, cmd)
+
+        ufload.progress("Restore %s from %s" % (db, args.file))
+        cmd = _restore_file(args, db)
+
+        # Windows pg_Restore gets confused when reading from a pipe,
+        # so do it without a pipe (and without progress indicators).
+        if sys.platform == "win32":
+            ufload.progress("Starting restore. This will take some time.")
+            cmd.append(args.file)
+            rc =_run(args, cmd)
+            rcstr = "ok"
+            if rc != 0:
+                rcstr = "error %d" % rc
+            ufload.progress("Restore done with result code: %s" % rcstr)
+            return rc
+        
+        # For not-windows, feed the data in via pipe so that we have
+        # some progress indication.
+        if args.show:
+            print "Would run:", cmd
+            return 0
+
+        p = subprocess.Popen(cmd, bufsize=1024*1024*10,
+                             stdin=subprocess.PIPE,
+                             stdout=sys.stdout,
+                             stderr=sys.stderr,
+                             env=pg_pass(args))
+        
+        statinfo = os.stat(args.file)
+        tot = float(statinfo.st_size)
+
+        n = 0
+        next = 10
+
+        with open(args.file, 'rb') as f:
+            for chunk in iter(lambda: f.read(8192), b''):
+                p.stdin.write(chunk)
+                n += len(chunk)
+                pct = n/tot * 100
+                if pct > next:
+                    ufload.progress("\rRestoring: %d%%" % int(pct))
+                    next = int(pct / 10)*10 + 10
+            p.stdin.close()
+
+        ufload.progress("\nRestoring: 100%%")
+        ufload.progress("Waiting for Postgres to finish restore")
+        rc = p.wait()
+
+        rcstr = "ok"
+        if rc != 0:
+            rcstr = "error %d" % rc
+        ufload.progress("Restore done with result code: %s" % rcstr)
+                
+        return rc
 
     # if we got here, we are in fact doing a multi-restore
     print "multi-restore not impl"
     return 1
+
+# http://stackoverflow.com/questions/519633/lazy-method-for-reading-big-file-in-python
+def read_in_chunks(file_object, chunk_size=8192):
+    """Lazy function (generator) to read a file piece by piece."""
+    once = True
+    while once:
+        data = file_object.read(chunk_size)
+        if not data:
+            break
+        once = False
+        yield data
 
 def _cmdLs(args):
     if not _required(args, [ 'user', 'pw', 'oc' ]):
