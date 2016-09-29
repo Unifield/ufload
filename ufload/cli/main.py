@@ -42,11 +42,6 @@ def _find_instance(fn):
     return fn.split('-')[0]
 
 def _cmdRestore(args):
-    if args.file is None:
-        if not _required(args, [ 'user', 'pw', 'oc' ]):
-            print 'Without the -file argument, ownCloud login info is needed.'
-            return 2
-
     if args.file is not None:
         # Find the instance name we are loading into
         if args.i is not None:
@@ -73,14 +68,36 @@ def _cmdRestore(args):
             return ufload.db.load_into(args, db, f, statinfo.st_size)
 
     # if we got here, we are in fact doing a multi-restore
-    print "multi-restore not impl"
+    if not _required(args, [ 'user', 'pw', 'oc' ]):
+        print 'With no -file argument, ownCloud login info is needed.'
+        return 2
+
+    if args.i is None:
+        ufload.progress("Multiple Instance restore for all instances in %s" % args.oc)
+    else:
+        ufload.progress("Multiple Instance restore for instances: %s" % ", ".join(args.i))
+
+    instances = ufload.cloud.list_files(user=args.user,
+                                    pw=args.pw,
+                                    where=_ocToDir(args.oc),
+                                    instances=args.i)
+    ufload.progress("Instances to be restored: %s" % ", ".join(instances.keys()))
+    for i in instances:
+        ufload.progress("Restore to instance %s" % i)
+        for j in instances[i]:
+            ufload.progress("Trying file %s" % j[1])
+            f, sz = ufload.cloud.openDumpInZip(j[0],
+                                           user=args.user,
+                                           pw=args.pw,
+                                           where=_ocToDir(args.oc))
+            ufload.db.load_into(args, i, f, sz) 
     return 1
 
 def _cmdLs(args):
     if not _required(args, [ 'user', 'pw', 'oc' ]):
         return 2
 
-    files = ufload.cloud.list_files(user=args.user,
+    instances = ufload.cloud.list_files(user=args.user,
                                     pw=args.pw,
                                     where=_ocToDir(args.oc),
                                     instances=args.i)
@@ -88,10 +105,9 @@ def _cmdLs(args):
         print "No files found."
         return 1
 
-    for i in files:
-        for j in files[i]:
+    for i in instances:
+        for j in instances[i]:
             print j[1]
-
     return 0
 
 def main():
@@ -139,3 +155,7 @@ def home():
     if sys.platform == "win32" and 'USERPROFILE' in os.environ:
         return os.environ['USERPROFILE']
     return os.environ['HOME']
+
+
+
+

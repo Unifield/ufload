@@ -61,6 +61,7 @@ def psql(args, sql):
     return _run(args, cmd)
     
 def load_into(args, db, f, sz):
+    print "load_into %s sz %d" % (type(f), sz)
     tot = float(sz)
 
     db2 = db + "_" + str(os.getpid())
@@ -70,7 +71,7 @@ def load_into(args, db, f, sz):
     if rc != 0:
         return rc
 
-    ufload.progress("Restore into %s from %s" % (db2, args.file))
+    ufload.progress("Restoring into %s" % db2)
 
     cmd = pg_restore(args)
     cmd.append('--no-acl')
@@ -91,13 +92,15 @@ def load_into(args, db, f, sz):
             for chunk in iter(lambda: f.read(8192), b''):
                 tf.write(chunk)
         tf.close()
+        ufload.progress("Temporary file %s created." % tf.name)
         cmd.append(tf.name)
 
         rc =_run(args, cmd)
         rcstr = "ok"
         if rc != 0:
             rcstr = "error %d" % rc
-        ufload.progress("Restore done with result code: %s" % rcstr)
+        if not args.show:
+            ufload.progress("Restore done with result code: %s" % rcstr)
 
         try:
             os.unlink(tf.name)

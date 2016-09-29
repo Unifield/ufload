@@ -45,18 +45,6 @@ def _get_all_files_and_timestamp(dav, d):
         ret.append((t, f.name))
     return ret
 
-def _lookInsideZip(f, dav):
-    # Fetch the ToC of the zip file
-    z = zipfile.ZipFile(ufload.httpfile.HttpFile(dav.baseurl+f.name,
-                                                 dav.session.auth[0],
-                                                 dav.session.auth[1]))
-    names = z.namelist()
-    if len(names) != 1:
-        logging.warn("Zipfile %s has unexpected files in it: %s" % (fn, names))
-    if len(names) > 0:
-        ret.append(names[0])
-    z.close()
-
 # returns True if x is matched by the pattern in instance
 def _match_instance_name(instance, x):
     ire = '^' + '.*'.join(map(lambda y : re.escape(y), instance.split('%'))) + '$'
@@ -115,3 +103,25 @@ def list_files(**kwargs):
         if _match_any_wildcard(inst, i):
             ret[i] = all[i]
     return ret
+
+# Returns a file-like-object
+def openDumpInZip(path, **kwargs):
+    host, directory = _splitCloudName(kwargs['where'])
+    dav = easywebdav.connect(host,
+                            username=kwargs['user'],
+                            password=kwargs['pw'],
+                            protocol='https')
+
+    # Fetch the ToC of the zip file
+    z = zipfile.ZipFile(ufload.httpfile.HttpFile(dav.baseurl+path,
+                                                 dav.session.auth[0],
+                                                 dav.session.auth[1]))
+    names = z.namelist()
+    if len(names) == 0:
+        logging.warn("Zipfile %s has no files in it." % fn)
+        return None
+    if len(names) != 1:
+        logging.warn("Zipfile %s has unexpected files in it: %s" % (fn, names))
+        return None
+
+    return z.open(names[0]), z.getinfo(names[0]).file_size
