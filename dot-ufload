@@ -2,11 +2,11 @@
 # in the directory printed by "set %USERPROFILE%".
 
 # Options related to logging in to ownCloud
-[cloud]
+[owncloud]
 user=username
 pw=password for ownCloud
 oc=which OC's backups you are using: OCG, OCA, or OCB
 
 [postgres]
-db_name=openpg
-db_user=your database password
+db_user=openpg
+db_pw=your database password

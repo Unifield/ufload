@@ -4,77 +4,6 @@ import binascii
 
 import ufload
 
-def pg_pass(args):
-    env = os.environ.copy()
-    if args.db_pw is not None:
-        env['PGPASSWORD'] = args.db_pw
-    return env
-
-# Find exe by looking in the PATH, prefering the one
-# installed by the AIO.
-def find_exe(exe):
-    if sys.platform == "win32":
-        path = [ 'D:\\MSF Data\\Unifield\\PostgreSQL\\bin',
-                 os.environ['PATH'].split(';') ]
-        bin = exe+".exe"
-    else:
-        path = os.environ['PATH'].split(':')
-        bin = exe
-
-    for p in path:
-        fn = os.path.join(p, bin)
-        if os.path.exists(fn):
-            return fn
-    # return the unqualified binary name and hope for
-    # the best...
-    return bin
-
-def pg_common(args):
-    res = []
-    if args.db_host is not None:
-        res.append('-h')
-        res.append(args.db_host)
-    if args.db_port is not None:
-        res.append('-p')
-        res.append(args.db_port)
-    if args.db_user is not None:
-        res.append('-U')
-        res.append(args.db_user)
-    return res
-
-def pg_restore(args):
-    return [ find_exe('pg_restore') ] + pg_common(args)
-
-def psql(args):
-    return [ find_exe('psql') ] + pg_common(args)
-
-# Returns a list with the arguments for pg_restore
-def _restore_file(args, db):
-    res = pg_restore(args)
-    res.append('--no-acl')
-    res.append('--no-owner')
-    res.append('-d')
-    res.append(db)
-    res.append('-n')
-    res.append('public')
-    return res
-
-def _drop_db(args, db):
-    cmd = psql(args)
-    cmd.append('-q')
-    cmd.append('-c')
-    cmd.append('DROP DATABASE IF EXISTS \"%s\"' % db)
-    cmd.append('postgres')
-    return cmd
-
-def _create_db(args, db):
-    cmd = psql(args)
-    cmd.append('-q')
-    cmd.append('-c')
-    cmd.append('CREATE DATABASE \"%s\"' % db)
-    cmd.append('postgres')
-    return cmd
-
 def _progress(p):
     if len(p)>0 and p[0] == "\r":
         # No \n please.
@@ -104,16 +33,6 @@ def _required(args, req):
             err += 1
     return err == 0
 
-def _run(args, cmd):
-    if args.show:
-        print "Would run:", " ".join(cmd)
-        rc = 0
-    else:
-        rc = subprocess.call(cmd, env=pg_pass(args))
-        if rc != 0:
-            print "pg_restore error code: %d" % rc
-    return rc
-
 # Turn
 # ../databases/OCG_MM1_WA-20160831-220427-A-UF2.1-2p3.dump into OCG_MM1_WA
 def _find_instance(fn):
@@ -129,6 +48,7 @@ def _cmdRestore(args):
             return 2
 
     if args.file is not None:
+        # Find the instance name we are loading into
         if args.i is not None:
             if len(args.i) != 1:
                 print "Expected only one -i argument."
@@ -143,84 +63,18 @@ def _cmdRestore(args):
                 print "Could not guess instance from filename. Use -i to specify it."
                 return 3
 
-        ufload.progress("Drop database "+db)
-        rc = _run(args, _drop_db(args, db))
-        if rc != 0:
-            return rc
-
-        ufload.progress("Create database "+db)
-        rc = _run(args, _create_db(args, db))
-        if rc != 0:
-            return rc
-
-        ufload.progress("Restore %s from %s" % (db, args.file))
-        cmd = _restore_file(args, db)
-
-        # Windows pg_Restore gets confused when reading from a pipe,
-        # so do it without a pipe (and without progress indicators).
-        if sys.platform == "win32":
-            ufload.progress("Starting restore. This will take some time.")
-            cmd.append(args.file)
-            rc =_run(args, cmd)
-            rcstr = "ok"
-            if rc != 0:
-                rcstr = "error %d" % rc
-            ufload.progress("Restore done with result code: %s" % rcstr)
-            return rc
+        try:
+            statinfo = os.stat(args.file)
+        except OSError as e:
+            ufload.progress("Could not find file size: "+str(e))
+            return 1
         
-        # For not-windows, feed the data in via pipe so that we have
-        # some progress indication.
-        if args.show:
-            print "Would run:", cmd
-            return 0
-
-        p = subprocess.Popen(cmd, bufsize=1024*1024*10,
-                             stdin=subprocess.PIPE,
-                             stdout=sys.stdout,
-                             stderr=sys.stderr,
-                             env=pg_pass(args))
-        
-        statinfo = os.stat(args.file)
-        tot = float(statinfo.st_size)
-
-        n = 0
-        next = 10
-
         with open(args.file, 'rb') as f:
-            for chunk in iter(lambda: f.read(8192), b''):
-                p.stdin.write(chunk)
-                n += len(chunk)
-                pct = n/tot * 100
-                if pct > next:
-                    ufload.progress("\rRestoring: %d%%" % int(pct))
-                    next = int(pct / 10)*10 + 10
-            p.stdin.close()
-
-        ufload.progress("\nRestoring: 100%%")
-        ufload.progress("Waiting for Postgres to finish restore")
-        rc = p.wait()
-
-        rcstr = "ok"
-        if rc != 0:
-            rcstr = "error %d" % rc
-        ufload.progress("Restore done with result code: %s" % rcstr)
-                
-        return rc
+            return ufload.db.load_into(args, db, f, statinfo.st_size)
 
     # if we got here, we are in fact doing a multi-restore
     print "multi-restore not impl"
     return 1
-
-# http://stackoverflow.com/questions/519633/lazy-method-for-reading-big-file-in-python
-def read_in_chunks(file_object, chunk_size=8192):
-    """Lazy function (generator) to read a file piece by piece."""
-    once = True
-    while once:
-        data = file_object.read(chunk_size)
-        if not data:
-            break
-        once = False
-        yield data
 
 def _cmdLs(args):
     if not _required(args, [ 'user', 'pw', 'oc' ]):
