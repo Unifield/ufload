@@ -38,11 +38,14 @@ tests_require = [
     'pytest',
 ]
 
+v=find_version("ufload", "__init__.py"),
+
 setup(
     name='ufload',
-    version=find_version("ufload", "__init__.py"),
+    version=v[0],
     description='Unifield loader',
     url='http://www.msf.org/',
+    download_url = 'https://github.com/Unifield/ufload/tarball/%s' % v[0],
     author='MSF',
     license='MIT License',
     packages=find_packages(exclude=['tests.*', 'tests']),
