@@ -90,7 +90,10 @@ def _cmdRestore(args):
                                            user=args.user,
                                            pw=args.pw,
                                            where=_ocToDir(args.oc))
-            ufload.db.load_into(args, i, f, sz) 
+            rc = ufload.db.load_into(args, i, f, sz)
+            if rc == 0:
+                # We got a good load, so go to the next instance.
+                break
     return 1
 
 def _cmdLs(args):
@@ -101,7 +104,7 @@ def _cmdLs(args):
                                     pw=args.pw,
                                     where=_ocToDir(args.oc),
                                     instances=args.i)
-    if len(files) == 0:
+    if len(instances) == 0:
         print "No files found."
         return 1
 

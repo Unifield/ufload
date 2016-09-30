@@ -4,7 +4,7 @@ import easywebdav
 import datetime, time
 import zipfile
 import collections
-import logging, re
+import logging, re, tempfile
 
 import ufload
 
@@ -104,6 +104,9 @@ def list_files(**kwargs):
             ret[i] = all[i]
     return ret
 
+def dlProgress(pct):
+    ufload.progress("Downloaded %d%%" % pct)
+
 # Returns a file-like-object
 def openDumpInZip(path, **kwargs):
     host, directory = _splitCloudName(kwargs['where'])
@@ -112,10 +115,17 @@ def openDumpInZip(path, **kwargs):
                             password=kwargs['pw'],
                             protocol='https')
 
-    # Fetch the ToC of the zip file
-    z = zipfile.ZipFile(ufload.httpfile.HttpFile(dav.baseurl+path,
-                                                 dav.session.auth[0],
-                                                 dav.session.auth[1]))
+    tf = tempfile.SpooledTemporaryFile(max_size=10*1024*1024)
+    sf = StatusFile(tf, dlProgress)
+    response = dav._send('HEAD', path, 200, stream=True)
+    if 'Content-Length' in response.headers:
+        sf.setSize(int(response.headers['Content-Length']))
+    else:
+        ufload.progress("Note: No download progress available.")
+        
+    dav.download(path, sf)
+    tf.seek(0, 0)
+    z = zipfile.ZipFile(tf)
     names = z.namelist()
     if len(names) == 0:
         logging.warn("Zipfile %s has no files in it." % fn)
@@ -123,5 +133,27 @@ def openDumpInZip(path, **kwargs):
     if len(names) != 1:
         logging.warn("Zipfile %s has unexpected files in it: %s" % (fn, names))
         return None
-
     return z.open(names[0]), z.getinfo(names[0]).file_size
+
+# An object that copies input to output, calling
+# the progress callback along the way.
+class StatusFile(object):
+    def __init__(self, fout, progress):
+        self.fout = fout
+        self.progress = progress
+        self.tot = None
+        self.next = 10
+        self.n = 0
+        
+    def setSize(self, sz):
+        self.tot = float(sz)
+        
+    def write(self, data):
+        self.n += len(data)
+        if self.tot is not None:
+            pct = int(self.n/self.tot*100)
+            if pct > self.next:
+                self.next = (pct/10)*10+10
+                self.progress(pct)
+        self.fout.write(data)
+

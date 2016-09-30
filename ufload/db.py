@@ -61,7 +61,6 @@ def psql(args, sql):
     return _run(args, cmd)
     
 def load_into(args, db, f, sz):
-    print "load_into %s sz %d" % (type(f), sz)
     tot = float(sz)
 
     db2 = db + "_" + str(os.getpid())
@@ -128,11 +127,11 @@ def load_into(args, db, f, sz):
             n += len(chunk)
             pct = n/tot * 100
             if pct > next:
-                ufload.progress("\rRestoring: %d%%" % int(pct))
+                ufload.progress("Restoring: %d%%" % int(pct))
                 next = int(pct / 10)*10 + 10
     
         p.stdin.close()
-        ufload.progress("\nRestoring: 100%%")
+        ufload.progress("Restoring: 100%")
         ufload.progress("Waiting for Postgres to finish restore")
         rc = p.wait()
 
@@ -151,6 +150,5 @@ def load_into(args, db, f, sz):
 
     ufload.progress("Rename database %s to %s" % (db2, db))
     rc = psql(args, 'ALTER DATABASE \"%s\" RENAME TO \"%s\"'%(db2, db))
-    if rc != 0:
-        return rc
 
+    return rc
