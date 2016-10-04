@@ -3,11 +3,17 @@ The Unifield Loader
 
 [![Build Status](https://travis-ci.org/Unifield/ufload.svg?branch=master)](https://travis-ci.org/Unifield/ufload)
 
-ufload is targeted at people who load dumps from live Unifield instances into non-production testing/staging/training instances. ufload will never leave a non-production database in a production configuration (it will stomp production passwords and disconnect from the live sync server).
+ufload is targeted at people who load dumps from live Unifield
+instances into non-production testing/staging/training
+instances. ufload will never leave a non-production database in a
+production configuration (it will stomp production passwords and
+disconnect from the live sync server).
 
 ufload is 100% Python, and has been tested on Linux and Windows.
 
-ufload can iterate over all the backups in a directory on ownCloud, and restore the latest backup from each of them. You can limit the list of instances to be restored.
+ufload can iterate over all the backups in a directory on ownCloud,
+and restore the latest backup for each instance. You can limit the
+list of instances to be restored.
 
 ufload can make coffee for you in the morning, and then do your dishes.
 
@@ -31,7 +37,9 @@ db_user=openpg
 db_pw=your database password
 ```
 
-For each line, put the right thing. If you do not want to put your password in the file, you can add the ```-pw``` flag to any command, after ```ufload.exe```.
+For each line, put the right thing. If you do not want to put your
+password in the file, you can add the ```-pw``` flag to any command,
+after ```ufload.exe```.
 
 ## Installing on Linux
 

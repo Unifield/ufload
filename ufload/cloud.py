@@ -18,9 +18,9 @@ def _splitCloudName(x):
 def _get_all_files_and_timestamp(dav, d):
     try:
         all_zip = dav.ls(d)
-    except easywebdav.client.OperationFailed as e:
+    except Exception as e:
         logging.warn(str(e))
-        all_zip = []
+        return []
 
     ret = []
     for f in all_zip:
@@ -45,10 +45,9 @@ def _get_all_files_and_timestamp(dav, d):
         ret.append((t, f.name))
     return ret
 
-# returns True if x is matched by the pattern in instance
+# returns True if x has instance as a substring
 def _match_instance_name(instance, x):
-    ire = '^' + '.*'.join(map(lambda y : re.escape(y), instance.split('%'))) + '$'
-    return bool(re.match(ire, x))
+    return instance in x
 
 # returns True is any of the instances match x
 # (returns True for all if instances is empty)
@@ -122,8 +121,13 @@ def openDumpInZip(path, **kwargs):
         sf.setSize(int(response.headers['Content-Length']))
     else:
         ufload.progress("Note: No download progress available.")
-        
-    dav.download(path, sf)
+
+    try:
+        dav.download(path, sf)
+    except Exception as e:
+        logging.warn("Could not download file: " + str(e))
+        return None
+    
     tf.seek(0, 0)
     z = zipfile.ZipFile(tf)
     names = z.namelist()

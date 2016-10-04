@@ -1,5 +1,5 @@
 # This is an example $HOME/.ufload file. On windows, it should be
-# in the directory printed by "set %USERPROFILE%".
+# in the directory printed by "set %USERPROFILE%", as ufload.txt.
 
 # Options related to logging in to ownCloud
 [owncloud]
@@ -7,6 +7,14 @@ user=username
 pw=password for ownCloud
 oc=which OC's backups you are using: OCG, OCA, or OCB
 
+# Only needed when using the -sync option to restore
+#[sync]
+#syncuser=the username for accessing the sync server backup
+#syncpw=the password for accessing the sync server backup
+
 [postgres]
 db_user=openpg
 db_pw=your database password
+# you might also need to set:
+# db_host=
+# db_port=

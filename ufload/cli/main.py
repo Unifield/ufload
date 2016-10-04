@@ -1,6 +1,8 @@
 import ConfigParser, argparse, os, sys
 import subprocess
 import binascii
+import requests
+import requests.auth
 
 import ufload
 
@@ -34,40 +36,49 @@ def _required(args, req):
     return err == 0
 
 # Turn
-# ../databases/OCG_MM1_WA-20160831-220427-A-UF2.1-2p3.dump into OCG_MM1_WA
+# ../databases/OCG_MM1_WA-20160831-220427-A-UF2.1-2p3.dump into OCG_MM1_WA_20160831_2204
 def _find_instance(fn):
     fn = os.path.basename(fn)
-    if '-' not in fn:
+    x = fn.split('-')
+    if len(x) < 2 or len(x[2]) != 6:
         return None
-    return fn.split('-')[0]
+    return "_".join([ x[0], x[1], x[2][0:4]])
 
 def _cmdRestore(args):
     if args.file is not None:
-        # Find the instance name we are loading into
-        if args.i is not None:
-            if len(args.i) != 1:
-                print "Expected only one -i argument."
-                return 3
-            if "%" in args.i[0]:
-                print "Wildcards not allowed when using -i to set the database."
-                return 3
-            db = args.i[0]
-        else:
-            db = _find_instance(args.file)
-            if db is None:
-                print "Could not guess instance from filename. Use -i to specify it."
-                return 3
+        rc = _fileRestore(args)
+    else:
+        rc = _multiRestore(args)
+    if rc != 0:
+        return rc
 
-        try:
-            statinfo = os.stat(args.file)
-        except OSError as e:
-            ufload.progress("Could not find file size: "+str(e))
-            return 1
+    if args.sync:
+        rc = _syncRestore(args)
+    return rc
+    
+def _fileRestore(args):
+    # Find the instance name we are loading into
+    if args.i is not None:
+        if len(args.i) != 1:
+            print "Expected only one -i argument."
+            return 3
+        db = args.i[0]
+    else:
+        db = _find_instance(args.file)
+        if db is None:
+            print "Could not set the instance from the filename. Use -i to specify it."
+            return 3
+
+    try:
+        statinfo = os.stat(args.file)
+    except OSError as e:
+        ufload.progress("Could not find file size: "+str(e))
+        return 1
         
-        with open(args.file, 'rb') as f:
-            return ufload.db.load_into(args, db, f, statinfo.st_size)
+    with open(args.file, 'rb') as f:
+        return ufload.db.load_into(args, db, f, statinfo.st_size)
 
-    # if we got here, we are in fact doing a multi-restore
+def _multiRestore(args):
     if not _required(args, [ 'user', 'pw', 'oc' ]):
         print 'With no -file argument, ownCloud login info is needed.'
         return 2
@@ -75,7 +86,7 @@ def _cmdRestore(args):
     if args.i is None:
         ufload.progress("Multiple Instance restore for all instances in %s" % args.oc)
     else:
-        ufload.progress("Multiple Instance restore for instances: %s" % ", ".join(args.i))
+        ufload.progress("Multiple Instance restore for instances matching: %s" % " or ".join(args.i))
 
     instances = ufload.cloud.list_files(user=args.user,
                                     pw=args.pw,
@@ -83,18 +94,54 @@ def _cmdRestore(args):
                                     instances=args.i)
     ufload.progress("Instances to be restored: %s" % ", ".join(instances.keys()))
     for i in instances:
-        ufload.progress("Restore to instance %s" % i)
         for j in instances[i]:
             ufload.progress("Trying file %s" % j[1])
             f, sz = ufload.cloud.openDumpInZip(j[0],
                                            user=args.user,
                                            pw=args.pw,
                                            where=_ocToDir(args.oc))
-            rc = ufload.db.load_into(args, i, f, sz)
+            if f is None:
+                continue
+            
+            db = _find_instance(f.name)
+            if db is None:
+                ufload.progress("Bad filename %s. Skipping." % f.name)
+                continue
+            
+            rc = ufload.db.load_into(args, db, f, sz)
             if rc == 0:
                 # We got a good load, so go to the next instance.
                 break
-    return 1
+    return 0
+
+def _syncRestore(args):
+    if not _required(args, [ 'syncuser', 'syncpw' ]):
+        return 2
+    db = 'SYNC_SERVER_LOCAL'
+    url = "http://sync-prod_dump.uf5.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
+    up = args.syncuser + ':' + args.syncpw
+
+    try:
+        r = requests.head(url,
+                          auth=requests.auth.HTTPBasicAuth(args.syncuser, args.syncpw))
+        if r.status_code != 200:
+	    ufload.progress("HTTP HEAD error: %s" % r.status_code)
+            return 1
+    except KeyboardInterrupt as e:
+        raise e
+    except Exception as  e:
+        ufload.progress("Failed to fetch sync server: " + str(e))
+        return 1
+    
+    sz = r.headers.get('content-length', 0)
+        
+    r = requests.get(url,
+                     auth=requests.auth.HTTPBasicAuth(args.syncuser, args.syncpw),
+                     stream=True)
+    if r.status_code != 200:
+	ufload.progress("HTTP GET error: %s" % r.status_code)
+        return 1
+    return ufload.db.load_into(args, db, r.raw, sz)
 
 def _cmdLs(args):
     if not _required(args, [ 'user', 'pw', 'oc' ]):
@@ -113,12 +160,16 @@ def _cmdLs(args):
             print j[1]
     return 0
 
+
 def main():
     parser = argparse.ArgumentParser(prog='ufload')
 
     parser.add_argument("-user", help="ownCloud username")
     parser.add_argument("-pw", help="ownCloud password")
     parser.add_argument("-oc", help="ownCloud directory (OCG, OCA, OCB accepted as shortcuts)")
+
+    parser.add_argument("-syncuser", help="username to access the sync server backup")
+    parser.add_argument("-syncpw", help="password to access the sync server backup")
 
     parser.add_argument("-db-host", help="Postgres host")
     parser.add_argument("-db-port", help="Postgres port")
@@ -130,20 +181,28 @@ def main():
                                 help='additional help')
 
     pLs = sub.add_parser('ls', help="List available backups")
-    pLs.add_argument("-i", action="append", help="instances to work on (use % as a wildcard)")
+    pLs.add_argument("-i", action="append", help="instances to work on (matched as a substring)")
     pLs.set_defaults(func=_cmdLs)
 
     pRestore = sub.add_parser('restore', help="Restore a database from ownCloud or a file")
-    pRestore.add_argument("-i", action="append", help="instances to work on (use % as a wildcard)")
+    pRestore.add_argument("-i", action="append", help="instances to work on (matched as a substring)")
     pRestore.add_argument("-n", dest='show', action='store_true', help="no real work; only show what would happen")
     pRestore.add_argument("-file", help="the file to restore (disabled ownCloud downloading)")
+    pRestore.add_argument("-adminpw", default='admin', help="the password to set into the newly restored database")
+    pRestore.add_argument("-live", dest='live', action='store_true', help="do not take the normal actions to make a restore into a non-production instance")
+    pRestore.add_argument("-load-sync-server", dest='sync', action='store_true', help="set up a local sync server")    
     pRestore.set_defaults(func=_cmdRestore)
 
     # read from $HOME/.ufload first
     conffile = ConfigParser.SafeConfigParser()
-    conffile.read('%s/.ufload' % home())
+    if sys.platform == "win32":
+        conffile.read('%s/ufload.txt' % home())
+    else:
+        conffile.read('%s/.ufload' % home())
+        
     for subp, subn in ((parser, "owncloud"),
                        (parser, "postgres"),
+                       (parser, "sync"),
                        (pLs, "ls"),
                        (pRestore, "restore")):
         if conffile.has_section(subn):
@@ -152,7 +211,10 @@ def main():
     # now that the config file is applied, parse from cmdline
     args = parser.parse_args()
     if hasattr(args, "func"):
-        sys.exit(args.func(args))
+        try:
+            sys.exit(args.func(args))
+        except KeyboardInterrupt:
+            sys.exit(1)
 
 def home():
     if sys.platform == "win32" and 'USERPROFILE' in os.environ:
