@@ -23,7 +23,7 @@ ufload can make coffee for you in the morning, and then do your dishes.
 2. Add these directories to your PATH, separated by semi-colons:
   * c:\Python27
   * c:\Python27\Scripts
-3. In a new CMD.EXE window, type: ```pip install ufload```
+3. In a new CMD.EXE window, type: ```pip install --upgrade ufload```
 4. Run ```ufload -h``` to get help.
 5. Use Notepad to create a config file. Put the file in the same place CMD.EXE starts from, for example ```d:\Users\jae```. The file should be named ufload.txt. Put the following into it:
 ```
@@ -43,9 +43,13 @@ after ```ufload.exe```.
 
 ## Installing on Linux
 
-```sudo pip install ufload```
+```sudo pip install --upgrade ufload```
 
 The config file is in $HOME/.ufload
+
+## Upgrading
+
+Use the same command as you used to install it: ```pip install --upgrade ufload```
 
 ## Example Commands
 
