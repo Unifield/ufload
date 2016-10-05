@@ -37,7 +37,7 @@ def _required(args, req):
 
 # Turn
 # ../databases/OCG_MM1_WA-20160831-220427-A-UF2.1-2p3.dump into OCG_MM1_WA_20160831_2204
-def _find_instance(fn):
+def _file_to_db(fn):
     fn = os.path.basename(fn)
     x = fn.split('-')
     if len(x) < 2 or len(x[2]) != 6:
@@ -46,14 +46,15 @@ def _find_instance(fn):
 
 def _cmdRestore(args):
     if args.file is not None:
-        rc = _fileRestore(args)
+        rc, dbs = _fileRestore(args)
     else:
-        rc = _multiRestore(args)
+        rc, dbs = _multiRestore(args)
+
     if rc != 0:
         return rc
 
     if args.sync:
-        rc = _syncRestore(args)
+        rc = _syncRestore(args, dbs)
     return rc
     
 def _fileRestore(args):
@@ -64,7 +65,7 @@ def _fileRestore(args):
             return 3
         db = args.i[0]
     else:
-        db = _find_instance(args.file)
+        db = _file_to_db(args.file)
         if db is None:
             print "Could not set the instance from the filename. Use -i to specify it."
             return 3
@@ -74,9 +75,13 @@ def _fileRestore(args):
     except OSError as e:
         ufload.progress("Could not find file size: "+str(e))
         return 1
-        
+
     with open(args.file, 'rb') as f:
-        return ufload.db.load_into(args, db, f, statinfo.st_size)
+        rc = ufload.db.load_into(args, db, f, statinfo.st_size)
+    if rc == 0:
+        return 0, [ db ]
+    else:
+        return rc
 
 def _multiRestore(args):
     if not _required(args, [ 'user', 'pw', 'oc' ]):
@@ -93,8 +98,10 @@ def _multiRestore(args):
                                     where=_ocToDir(args.oc),
                                     instances=args.i)
     ufload.progress("Instances to be restored: %s" % ", ".join(instances.keys()))
+    dbs=[]
     for i in instances:
-        for j in instances[i]:
+        files_for_instance = instances[i]
+        for j in files_for_instance:
             ufload.progress("Trying file %s" % j[1])
             f, sz = ufload.cloud.openDumpInZip(j[0],
                                            user=args.user,
@@ -103,7 +110,7 @@ def _multiRestore(args):
             if f is None:
                 continue
             
-            db = _find_instance(f.name)
+            db = _file_to_db(f.name)
             if db is None:
                 ufload.progress("Bad filename %s. Skipping." % f.name)
                 continue
@@ -111,13 +118,15 @@ def _multiRestore(args):
             rc = ufload.db.load_into(args, db, f, sz)
             if rc == 0:
                 # We got a good load, so go to the next instance.
+                dbs.append(db)
                 break
-    return 0
 
-def _syncRestore(args):
+    return 0, dbs
+
+def _syncRestore(args, dbs):
     if not _required(args, [ 'syncuser', 'syncpw' ]):
         return 2
-    db = 'SYNC_SERVER_LOCAL'
+    sdb = 'SYNC_SERVER_LOCAL'
     url = "http://sync-prod_dump.uf5.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
     up = args.syncuser + ':' + args.syncpw
 
@@ -141,7 +150,21 @@ def _syncRestore(args):
     if r.status_code != 200:
 	ufload.progress("HTTP GET error: %s" % r.status_code)
         return 1
-    return ufload.db.load_into(args, db, r.raw, sz)
+    rc = ufload.db.load_into(args, sdb, r.raw, sz)
+    if rc != 0:
+        return rc
+
+    # Hook up all the databases we are currently working on
+    hwid = ufload.db.get_hwid(args)
+    if hwid is None:
+        ufload.progress("No hardware id available, you will need to manually link your instances to SYNC_SERVER_LOCAL.")
+        return 0
+
+    for db in dbs:
+        rc = ufload.db.sync_link(args, hwid, db, sdb)
+        if rc != 0:
+            return rc
+    return 0
 
 def _cmdLs(args):
     if not _required(args, [ 'user', 'pw', 'oc' ]):
@@ -220,7 +243,3 @@ def home():
     if sys.platform == "win32" and 'USERPROFILE' in os.environ:
         return os.environ['USERPROFILE']
     return os.environ['HOME']
-
-
-
-

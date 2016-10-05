@@ -114,11 +114,15 @@ def load_into(args, db, f, sz):
                             next = int(pct / 10)*10 + 10
 
             tf.close()
-            ufload.progress("Temporary file %s created." % tf.name)
             cmd.append(tf.name)
-                    
+
             ufload.progress("Starting restore. This will take some time.")
-            rc =_run(args, cmd)
+            try:
+                rc =_run(args, cmd)
+            except KeyboardInterrupt:
+                raise dbException(1)
+
+            # clean up the temp file
             try:
                 os.unlink(tf.name)
             except OSError:
@@ -255,3 +259,25 @@ def killCons(args, db):
         except ValueError:
             # skip lines which are not numbers
             pass
+
+def get_hwid(args):
+    if sys.platform == 'win32':
+        import _winreg
+        try:
+            with _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,
+                                 "SYSTEM\ControlSet001\services\eventlog\Application\openerp-web-6.0",
+                                 0, _winreg.KEY_READ) as registry_key:
+                hwid, regtype = _winreg.QueryValueEx(registry_key, "HardwareId")
+                ufload.progress("Hardware id from registry key: %s" % hwid)
+                return hwid
+        except WindowsError:
+            return None
+    else:
+        return None
+
+def _db_to_instance(db):
+    return '_'.join(db.split('_')[0:-2])
+
+def sync_link(args, hwid, db, sdb):
+    return psql(args, 'update sync_server_entity set hardware_id = \'%s\' where name = \'%s\';' % (hwid, _db_to_instance(db)), sdb)
+
