@@ -6,6 +6,11 @@ import requests.auth
 
 import ufload
 
+def _home():
+    if sys.platform == "win32" and 'USERPROFILE' in os.environ:
+        return os.environ['USERPROFILE']
+    return os.environ['HOME']
+
 def _progress(p):
     if len(p)>0 and p[0] == "\r":
         # No \n please.
@@ -45,6 +50,10 @@ def _file_to_db(fn):
     return "_".join([ x[0], x[1], x[2][0:4]])
 
 def _cmdRestore(args):
+    if args.sync:
+        if not _required(args, [ 'syncuser', 'syncpw' ]):
+            return 2
+
     if args.file is not None:
         rc, dbs = _fileRestore(args)
     else:
@@ -55,6 +64,7 @@ def _cmdRestore(args):
 
     if args.sync:
         rc = _syncRestore(args, dbs)
+
     return rc
     
 def _fileRestore(args):
@@ -124,8 +134,6 @@ def _multiRestore(args):
     return 0, dbs
 
 def _syncRestore(args, dbs):
-    if not _required(args, [ 'syncuser', 'syncpw' ]):
-        return 2
     sdb = 'SYNC_SERVER_LOCAL'
     url = "http://sync-prod_dump.uf5.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
     up = args.syncuser + ':' + args.syncpw
@@ -154,6 +162,10 @@ def _syncRestore(args, dbs):
     if rc != 0:
         return rc
 
+    return _syncLink(args, dbs, sdb)
+
+# separate function to make testing easier
+def _syncLink(args, dbs, sdb):
     # Hook up all the databases we are currently working on
     hwid = ufload.db.get_hwid(args)
     if hwid is None:
@@ -183,8 +195,7 @@ def _cmdLs(args):
             print j[1]
     return 0
 
-
-def main():
+def parse():
     parser = argparse.ArgumentParser(prog='ufload')
 
     parser.add_argument("-user", help="ownCloud username")
@@ -219,9 +230,9 @@ def main():
     # read from $HOME/.ufload first
     conffile = ConfigParser.SafeConfigParser()
     if sys.platform == "win32":
-        conffile.read('%s/ufload.txt' % home())
+        conffile.read('%s/ufload.txt' % _home())
     else:
-        conffile.read('%s/.ufload' % home())
+        conffile.read('%s/.ufload' % _home())
         
     for subp, subn in ((parser, "owncloud"),
                        (parser, "postgres"),
@@ -232,14 +243,13 @@ def main():
             subp.set_defaults(**dict(conffile.items(subn)))
 
     # now that the config file is applied, parse from cmdline
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def main():
+    args = parse()
     if hasattr(args, "func"):
         try:
             sys.exit(args.func(args))
         except KeyboardInterrupt:
             sys.exit(1)
 
-def home():
-    if sys.platform == "win32" and 'USERPROFILE' in os.environ:
-        return os.environ['USERPROFILE']
-    return os.environ['HOME']

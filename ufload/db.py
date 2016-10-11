@@ -217,6 +217,9 @@ def delive(args, db):
     rc = psql(args, 'update ir_cron set active = \'f\' where model = \'sync.client.entity\';', db)
     if rc != 0:
         return rc
+    rc = psql(args, 'update ir_cron set active = \'f\' where model = \'stock.mission.report\';', db)
+    if rc != 0:
+        return rc
 
     # Set the backup directory
     directory = "E'd:\\\\'"
@@ -273,7 +276,12 @@ def get_hwid(args):
         except WindowsError:
             return None
     else:
-        return None
+        try:
+            with open("/opt/unifield/hwid.txt", "r") as f:
+                hwid = f.read()
+            return hwid.strip()
+        except IOError:
+            return None
 
 def _db_to_instance(db):
     return '_'.join(db.split('_')[0:-2])
