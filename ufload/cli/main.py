@@ -11,12 +11,11 @@ def _home():
         return os.environ['USERPROFILE']
     return os.environ['HOME']
 
+_logs = []
 def _progress(p):
-    if len(p)>0 and p[0] == "\r":
-        # No \n please.
-        sys.stderr.write(p)
-    else:
-        print >> sys.stderr, p
+    global _logs
+    print >> sys.stderr, p
+    _logs.append(p)
 
 ufload.progress = _progress
 
@@ -36,7 +35,7 @@ def _required(args, req):
     err = 0
     for r in req:
         if getattr(args, r) is None:
-            print 'Argument %s is required for this sub-command.' % r
+            ufload.progress('Argument %s is required for this sub-command.' % r)
             err += 1
     return err == 0
 
@@ -65,38 +64,41 @@ def _cmdRestore(args):
     if args.sync:
         rc = _syncRestore(args, dbs)
 
+    if not args.noclean:
+        rc = ufload.db.clean(args, dbs)
+        
     return rc
-    
+
 def _fileRestore(args):
     # Find the instance name we are loading into
     if args.i is not None:
         if len(args.i) != 1:
-            print "Expected only one -i argument."
-            return 3
+            ufload.progress("Expected only one -i argument.")
+            return 3, None
         db = args.i[0]
     else:
         db = _file_to_db(args.file)
         if db is None:
-            print "Could not set the instance from the filename. Use -i to specify it."
-            return 3
+            ufload.progress("Could not set the instance from the filename. Use -i to specify it.")
+            return 3, None
 
     try:
         statinfo = os.stat(args.file)
     except OSError as e:
         ufload.progress("Could not find file size: "+str(e))
-        return 1
+        return 1, None
 
     with open(args.file, 'rb') as f:
         rc = ufload.db.load_into(args, db, f, statinfo.st_size)
     if rc == 0:
         return 0, [ db ]
     else:
-        return rc
+        return rc, None
 
 def _multiRestore(args):
     if not _required(args, [ 'user', 'pw', 'oc' ]):
-        print 'With no -file argument, ownCloud login info is needed.'
-        return 2
+        ufload.progress('With no -file argument, ownCloud login info is needed.')
+        return 2, None
 
     if args.i is None:
         ufload.progress("Multiple Instance restore for all instances in %s" % args.oc)
@@ -150,8 +152,13 @@ def _syncRestore(args, dbs):
         ufload.progress("Failed to fetch sync server: " + str(e))
         return 1
     
-    sz = r.headers.get('content-length', 0)
-        
+    sz = int(r.headers.get('content-length', 0))
+    szdb = ufload.db.get_sync_server_len(args, sdb)
+
+    if szdb == sz:
+        ufload.progress("Sync server is up to date.")
+        return 0
+    
     r = requests.get(url,
                      auth=requests.auth.HTTPBasicAuth(args.syncuser, args.syncpw),
                      stream=True)
@@ -161,6 +168,7 @@ def _syncRestore(args, dbs):
     rc = ufload.db.load_into(args, sdb, r.raw, sz)
     if rc != 0:
         return rc
+    ufload.db.write_sync_server_len(args, sz, sdb)
 
     return _syncLink(args, dbs, sdb)
 
@@ -187,12 +195,12 @@ def _cmdLs(args):
                                     where=_ocToDir(args.oc),
                                     instances=args.i)
     if len(instances) == 0:
-        print "No files found."
+        ufload.progress("No files found.")
         return 1
 
     for i in instances:
         for j in instances[i]:
-            print j[1]
+            ufload.progress(j[1])
     return 0
 
 def parse():
@@ -209,6 +217,7 @@ def parse():
     parser.add_argument("-db-port", help="Postgres port")
     parser.add_argument("-db-user", help="Postgres user")
     parser.add_argument("-db-pw", help="Postgres password")
+    parser.add_argument("-remote", help="Remote log server")
 
     sub = parser.add_subparsers(title='subcommands',
                                 description='valid subcommands',
@@ -224,6 +233,7 @@ def parse():
     pRestore.add_argument("-file", help="the file to restore (disabled ownCloud downloading)")
     pRestore.add_argument("-adminpw", default='admin', help="the password to set into the newly restored database")
     pRestore.add_argument("-live", dest='live', action='store_true', help="do not take the normal actions to make a restore into a non-production instance")
+    pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
     pRestore.add_argument("-load-sync-server", dest='sync', action='store_true', help="set up a local sync server")    
     pRestore.set_defaults(func=_cmdRestore)
 
@@ -236,6 +246,7 @@ def parse():
         
     for subp, subn in ((parser, "owncloud"),
                        (parser, "postgres"),
+                       (parser, "logs"),
                        (parser, "sync"),
                        (pLs, "ls"),
                        (pRestore, "restore")):
@@ -249,7 +260,15 @@ def main():
     args = parse()
     if hasattr(args, "func"):
         try:
-            sys.exit(args.func(args))
+            rc = args.func(args)
         except KeyboardInterrupt:
-            sys.exit(1)
+            rc = 1
 
+    if args.remote:
+        import socket
+        hostname = socket.gethostname() or 'unknown'
+        ufload.progress("Will exit with result code: %d" % rc)
+        ufload.progress("Posting logs to remote server.")
+        requests.post(args.remote+"?who=%s"%hostname, data='\n'.join(_logs))
+    
+    sys.exit(rc)

@@ -36,7 +36,6 @@ def _get_all_files_and_timestamp(dav, d):
         # We don't take into consideration backups that are too recent.
         # Otherwise they could be half uploaded (=> corrupted)
         if abs(time.time() - time.mktime(t)) < 900:
-            # print "SKIP", f.name, "(too recent)"
             continue
 
         if f.name.split(".")[-1] != "zip":
@@ -73,7 +72,7 @@ def _group_files_to_download(files):
         isplit = f.rindex('/')
         filename = f[isplit+1:]
         if '-' not in filename:
-            print "unexpected filename:", filename
+            ufload.progress("unexpected filename: "+ filename)
             continue
 
         instance = '-'.join(filename.split('-')[:-1])

@@ -6,7 +6,7 @@ def _run_out(args, cmd):
         
 def _run(args, cmd, silent=False):
     if args.show:
-        print "Would run:", cmd
+        ufload.progress("Would run: " + cmd)
         rc = 0
     else:
         if silent:
@@ -156,7 +156,7 @@ def load_into(args, db, f, sz):
                 ufload.progress("Waiting for Postgres to finish restore")
                 rc = p.wait()
             else:
-                print "Would run:", cmd
+                ufload.progress("Would run: "+ cmd)
                 rc = 0
 
         rcstr = "ok"
@@ -193,7 +193,7 @@ def load_into(args, db, f, sz):
 def delive(args, db):
     if args.live:
         ufload.progress("*** WARNING: The restored database has LIVE passwords and LIVE syncing.")
-        return
+        return 0
     
     # ensure they know the username for the admin account: set its name to admin
     rc = psql(args, 'update res_users set login = \'admin\' where id = 1;', db)
@@ -277,10 +277,15 @@ def get_hwid(args):
             return None
     else:
         try:
-            with open("/opt/unifield/hwid.txt", "r") as f:
-                hwid = f.read()
-            return hwid.strip()
-        except IOError:
+            # Follow the same algorithm that Unifield uses (see sync_client.py)
+            for line in os.popen("/sbin/ifconfig"):
+                if line.find('Ether') > -1:
+                    mac.append(line.split()[4])
+                    
+            mac.sort()
+            hw_hash = hashlib.md5(''.join(mac)).hexdigest()
+            return hw_hash
+        except:
             return None
 
 def _db_to_instance(db):
@@ -288,4 +293,41 @@ def _db_to_instance(db):
 
 def sync_link(args, hwid, db, sdb):
     return psql(args, 'update sync_server_entity set hardware_id = \'%s\' where name = \'%s\';' % (hwid, _db_to_instance(db)), sdb)
+
+# Remove all databases which come from the same instance as one of the instances
+# in dbs, but which are not in dbs.
+def clean(args, dbs):
+    toClean = {}
+    toKeep = {}
+    for d in dbs:
+        i = _db_to_instance(d)
+        toClean[i] = True
+        toKeep[d] = True
+        
+    for d in _allDbs(args):
+        i = _db_to_instance(d)
+        if d not in toKeep and i in toClean:
+            ufload.progress("Cleaning other database for instance %s: %s" % (i, d))
+            rc = psql(args, 'DROP DATABASE IF EXISTS \"%s\"'%d)
+            if rc != 0:
+                return rc
+    return 0            
+
+def _allDbs(args):
+    v = _run_out(args, mkpsql(args, 'select datname from pg_database where datistemplate = false and datname != \'postgres\''))
+    return map(lambda x: x.strip(), filter(len, v))
+
+# These two functions read and write from a little "about" table
+# where we store the size of the input file, which helps us avoid
+# reloading the sync server when we don't need to.
+def get_sync_server_len(args, db='SYNC_SERVER_LOCAL'):
+    try:
+        l = _run_out(args, mkpsql(args, 'select length from about', db))
+        return int(filter(len, l)[0])
+    except subprocess.CalledProcessError:
+        pass
+    return -1
+
+def write_sync_server_len(args, l, db='SYNC_SERVER_LOCAL'):
+    _run_out(args, mkpsql(args, 'drop table if exists about; create table about ( length int ); insert into about values ( %d )' % l, db))
 

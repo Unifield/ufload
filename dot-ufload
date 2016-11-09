@@ -7,8 +7,8 @@ user=username
 pw=password for ownCloud
 oc=which OC's backups you are using: OCG, OCA, or OCB
 
-# Only needed when using the -sync option to restore
-#[sync]
+# Only needed when using "ufload restore -load-sync-server"
+[sync]
 #syncuser=the username for accessing the sync server backup
 #syncpw=the password for accessing the sync server backup
 
@@ -18,3 +18,9 @@ db_pw=your database password
 # you might also need to set:
 # db_host=
 # db_port=
+
+# If you want to send copies of the logs to a central collector,
+# uncomment remote below. You will also need the key from the
+# admin of the remote collector.
+[logs]
+#remote=http://testfield-ctl.uf5.unifield.org/save-log.cgi/[key]
