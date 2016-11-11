@@ -1,7 +1,7 @@
 import cloud
 import db
 
-__version__ = '0.5'
+__version__ = '0.6'
 
 # null progress, can be overridden by importers
 def _progress(p):
