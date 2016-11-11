@@ -1,4 +1,4 @@
-import os, sys, subprocess, tempfile
+import os, sys, subprocess, tempfile, hashlib
 import ufload
 
 def _run_out(args, cmd):
@@ -6,7 +6,7 @@ def _run_out(args, cmd):
         
 def _run(args, cmd, silent=False):
     if args.show:
-        ufload.progress("Would run: " + cmd)
+        ufload.progress("Would run: " + str(cmd))
         rc = 0
     else:
         if silent:
@@ -156,7 +156,7 @@ def load_into(args, db, f, sz):
                 ufload.progress("Waiting for Postgres to finish restore")
                 rc = p.wait()
             else:
-                ufload.progress("Would run: "+ cmd)
+                ufload.progress("Would run: "+ str(cmd))
                 rc = 0
 
         rcstr = "ok"
@@ -195,8 +195,8 @@ def delive(args, db):
         ufload.progress("*** WARNING: The restored database has LIVE passwords and LIVE syncing.")
         return 0
     
-    # ensure they know the username for the admin account: set its name to admin
-    rc = psql(args, 'update res_users set login = \'admin\' where id = 1;', db)
+    # set the username of the admin account
+    rc = psql(args, 'update res_users set login = \'%s\' where id = 1;' % args.adminuser, db)
     if rc != 0:
         return rc
 
@@ -276,17 +276,15 @@ def get_hwid(args):
         except WindowsError:
             return None
     else:
-        try:
-            # Follow the same algorithm that Unifield uses (see sync_client.py)
-            for line in os.popen("/sbin/ifconfig"):
-                if line.find('Ether') > -1:
-                    mac.append(line.split()[4])
+        # Follow the same algorithm that Unifield uses (see sync_client.py)
+        mac = []
+        for line in os.popen("/sbin/ifconfig"):
+            if line.find('Ether') > -1:
+                mac.append(line.split()[4])
                     
-            mac.sort()
-            hw_hash = hashlib.md5(''.join(mac)).hexdigest()
-            return hw_hash
-        except:
-            return None
+        mac.sort()
+        hw_hash = hashlib.md5(''.join(mac)).hexdigest()
+        return hw_hash
 
 def _db_to_instance(db):
     return '_'.join(db.split('_')[0:-2])

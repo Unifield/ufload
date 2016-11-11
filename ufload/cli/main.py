@@ -26,7 +26,7 @@ def _ocToDir(oc):
     elif x == 'ocb':
         return 'OCB_Backups'
     elif x == 'ocg':
-        return 'UNIFIELD-BACKUP'
+        return 'OCG_Backups'
     else:
         # no OC abbrev, assume this is a real directory name
         return oc
@@ -231,6 +231,7 @@ def parse():
     pRestore.add_argument("-i", action="append", help="instances to work on (matched as a substring)")
     pRestore.add_argument("-n", dest='show', action='store_true', help="no real work; only show what would happen")
     pRestore.add_argument("-file", help="the file to restore (disabled ownCloud downloading)")
+    pRestore.add_argument("-adminuser", default='admin', help="the new admin username in the newly restored database")
     pRestore.add_argument("-adminpw", default='admin', help="the password to set into the newly restored database")
     pRestore.add_argument("-live", dest='live', action='store_true', help="do not take the normal actions to make a restore into a non-production instance")
     pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
