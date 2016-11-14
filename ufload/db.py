@@ -318,7 +318,7 @@ def _allDbs(args):
 
 def exists(args, db):
     v = _run_out(args, mkpsql(args, 'select datname from pg_database where datname = \'%s\'' % db))
-    v = map(lambda x: x.strip(), filter(len, v))
+    v = filter(len, map(lambda x: x.strip(), v))
     return len(v)==1 and v[0] == db
 
 # These two functions read and write from a little "about" table
