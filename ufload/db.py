@@ -196,7 +196,8 @@ def delive(args, db):
         return 0
     
     # set the username of the admin account
-    rc = psql(args, 'update res_users set login = \'%s\' where id = 1;' % args.adminuser, db)
+    adminuser = args.adminuser.lower()
+    rc = psql(args, 'update res_users set login = \'%s\' where id = 1;' % adminuser, db)
     if rc != 0:
         return rc
 
@@ -206,7 +207,7 @@ def delive(args, db):
         return rc
 
     # change the sync config to local
-    rc = psql(args, 'update sync_client_sync_server_connection set protocol = \'xmlrpc\', login = \'%s\', database = \'SYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = 8069;' % args.adminuser, db)
+    rc = psql(args, 'update sync_client_sync_server_connection set protocol = \'xmlrpc\', login = \'%s\', database = \'SYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = 8069;' % adminuser, db)
     if rc != 0:
         return rc
 

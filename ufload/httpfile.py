@@ -1,7 +1,6 @@
 # http://stackoverflow.com/questions/7829311/is-there-a-library-for-retrieving-a-file-from-a-remote-zip/7852229
 
 import requests
-import sys
 
 class HttpFile(object):
     def __init__(self, url, user, pw):
