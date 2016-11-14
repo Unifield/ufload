@@ -66,4 +66,8 @@ To load the OCG_HQ instance and all the OCG_NE1 instances from ownCloud: ```uflo
 You can use the Windows Task Scheduler to run ufload in order to update a
 sandbox environment every night.
 
-Use a command like this to schedule it: ```schtasks /create /F /TN Ufload /SC DAILY /st 20:00 /tr "cmd /C C:\python27\Scripts\ufload restore -load-sync-server >> d:\ufload.log 2>&1"```
+Use the remote option in the [logs] section to arrange for remote logging.
+
+Use a command like this to schedule it once a day: ```schtasks /create /F /TN Ufload /SC DAILY /st 20:00 /tr "cmd /C C:\python27\Scripts\ufload restore -load-sync-server"```
+
+Or this to make it run every hour: ```schtasks /create /F /TN Ufload /SC DAILY /RI 60 /st 00:00 /tr "cmd /C C:\python27\Scripts\ufload restore -load-sync-server"```

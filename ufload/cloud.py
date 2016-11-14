@@ -85,11 +85,11 @@ def _group_files_to_download(files):
 # in order from new to old.
 def list_files(**kwargs):
     host, directory = _splitCloudName(kwargs['where'])
-    webdav = easywebdav.connect(host,
+    dav = easywebdav.connect(host,
                             username=kwargs['user'],
                             password=kwargs['pw'],
                             protocol='https')
-    all = _get_all_files_and_timestamp(webdav, "/remote.php/webdav/"+directory)
+    all = _get_all_files_and_timestamp(dav, "/remote.php/webdav/"+directory)
     all = _group_files_to_download(all)
 
     inst = []
@@ -101,6 +101,31 @@ def list_files(**kwargs):
         if _match_any_wildcard(inst, i):
             ret[i] = all[i]
     return ret
+
+def peek_inside_file(path, fn, **kwargs):
+    host, directory = _splitCloudName(kwargs['where'])
+    dav = easywebdav.connect(host,
+                            username=kwargs['user'],
+                            password=kwargs['pw'],
+                            protocol='https')
+    try:
+        z = zipfile.ZipFile(ufload.httpfile.HttpFile(dav.baseurl+path,
+                                                     dav.session.auth[0],
+                                                     dav.session.auth[1]))
+    except zipfile.BadZipfile:
+        ufload.progress("Zipfile %s: could not read")
+        return None
+    
+    names = z.namelist()
+    if len(names) == 0:
+        ufload.progress("Zipfile %s has no files in it." % fn)
+        return None
+    if len(names) != 1:
+        ufload.progress("Zipfile %s has unexpected files in it: %s" % (fn, names))
+        return None
+    n = names[0]
+    z.close()
+    return n
 
 def dlProgress(pct):
     ufload.progress("Downloaded %d%%" % pct)

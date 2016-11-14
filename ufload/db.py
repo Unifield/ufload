@@ -223,7 +223,7 @@ def delive(args, db):
 
     # Set the backup directory
     directory = "E'd:\\\\'"
-    if sys.platform != "win32" and args.db_host in [ 'ct0', 'localhost' ]:
+    if sys.platform != "win32" and args.db_host in [ None, 'ct0', 'localhost' ]:
         # when loading on non-windows, to a local database, use /tmp
         directory = '\'/tmp\''
     
@@ -306,6 +306,7 @@ def clean(args, dbs):
         i = _db_to_instance(d)
         if d not in toKeep and i in toClean:
             ufload.progress("Cleaning other database for instance %s: %s" % (i, d))
+            killCons(args, d)
             rc = psql(args, 'DROP DATABASE IF EXISTS \"%s\"'%d)
             if rc != 0:
                 return rc
@@ -314,6 +315,11 @@ def clean(args, dbs):
 def _allDbs(args):
     v = _run_out(args, mkpsql(args, 'select datname from pg_database where datistemplate = false and datname != \'postgres\''))
     return map(lambda x: x.strip(), filter(len, v))
+
+def exists(args, db):
+    v = _run_out(args, mkpsql(args, 'select datname from pg_database where datname = \'%s\'' % db))
+    v = map(lambda x: x.strip(), filter(len, v))
+    return len(v)==1 and v[0] == db
 
 # These two functions read and write from a little "about" table
 # where we store the size of the input file, which helps us avoid

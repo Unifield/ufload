@@ -115,6 +115,21 @@ def _multiRestore(args):
         files_for_instance = instances[i]
         for j in files_for_instance:
             ufload.progress("Trying file %s" % j[1])
+            n = ufload.cloud.peek_inside_file(j[0], j[1],
+                                           user=args.user,
+                                           pw=args.pw,
+                                           where=_ocToDir(args.oc))
+            if n is None:
+                # no dump inside of zip, try the next one
+                continue
+
+            db = _file_to_db(str(n))
+            if ufload.db.exists(args, db):
+                ufload.progress("Database %s already exists." % db)
+                break
+            else:
+                ufload.progress("Database %s does not exist, restoring." % db)
+            
             f, sz = ufload.cloud.openDumpInZip(j[0],
                                            user=args.user,
                                            pw=args.pw,
@@ -200,7 +215,14 @@ def _cmdLs(args):
 
     for i in instances:
         for j in instances[i]:
-            ufload.progress(j[1])
+            n = ufload.cloud.peek_inside_file(j[0], j[1],
+                                              user=args.user,
+                                              pw=args.pw,
+                                              where=_ocToDir(args.oc))
+            print ": ".join((j[1], str(n)))
+            # only show the latest for each one
+            break
+        
     return 0
 
 def parse():
@@ -223,8 +245,8 @@ def parse():
                                 description='valid subcommands',
                                 help='additional help')
 
-    pLs = sub.add_parser('ls', help="List available backups")
-    pLs.add_argument("-i", action="append", help="instances to work on (matched as a substring)")
+    pLs = sub.add_parser('ls', help="List the most recent backup")
+    pLs.add_argument("-i", action="append", help="instances to work on (matched as a substring, default = all)")
     pLs.set_defaults(func=_cmdLs)
 
     pRestore = sub.add_parser('restore', help="Restore a database from ownCloud or a file")

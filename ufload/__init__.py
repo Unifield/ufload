@@ -1,5 +1,6 @@
 import cloud
 import db
+import httpfile
 
 __version__ = '0.6'
 
