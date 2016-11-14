@@ -39,12 +39,15 @@ def _required(args, req):
 
 # Turn
 # ../databases/OCG_MM1_WA-20160831-220427-A-UF2.1-2p3.dump into OCG_MM1_WA_20160831_2204
-def _file_to_db(fn):
+def _file_to_db(args, fn):
     fn = os.path.basename(fn)
     x = fn.split('-')
     if len(x) < 2 or len(x[2]) != 6:
         return None
-    return "_".join([ x[0], x[1], x[2][0:4]])
+    db = "_".join([ x[0], x[1], x[2][0:4]])
+    if args.db_prefix:
+        return args.db_prefix + "_" + db
+    return db
 
 def _cmdRestore(args):
     if args.sync:
@@ -75,7 +78,7 @@ def _fileRestore(args):
             return 3, None
         db = args.i[0]
     else:
-        db = _file_to_db(args.file)
+        db = _file_to_db(args, args.file)
         if db is None:
             ufload.progress("Could not set the instance from the filename. Use -i to specify it.")
             return 3, None
@@ -121,7 +124,7 @@ def _multiRestore(args):
                 # no dump inside of zip, try the next one
                 continue
 
-            db = _file_to_db(str(n))
+            db = _file_to_db(args, str(n))
             if ufload.db.exists(args, db):
                 ufload.progress("Database %s already exists." % db)
                 break
@@ -135,7 +138,7 @@ def _multiRestore(args):
             if f is None:
                 continue
             
-            db = _file_to_db(f.name)
+            db = _file_to_db(args, f.name)
             if db is None:
                 ufload.progress("Bad filename %s. Skipping." % f.name)
                 continue
@@ -235,6 +238,7 @@ def parse():
     parser.add_argument("-db-port", help="Postgres port")
     parser.add_argument("-db-user", help="Postgres user")
     parser.add_argument("-db-pw", help="Postgres password")
+    parser.add_argument("-db-prefix", help="Prefix to put on database names")
     parser.add_argument("-remote", help="Remote log server")
 
     sub = parser.add_subparsers(title='subcommands',

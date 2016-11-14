@@ -314,7 +314,11 @@ def clean(args, dbs):
     return 0            
 
 def _allDbs(args):
-    v = _run_out(args, mkpsql(args, 'select datname from pg_database where datistemplate = false and datname != \'postgres\''))
+    if args.db_user:
+        v = _run_out(args, mkpsql(args, 'select datname from pg_database where datdba=(select usesysid from pg_user where usename=\'%s\') and datistemplate = false and datname != \'postgres\'' % args.db_user))
+    else:
+        v = _run_out(args, mkpsql(args, 'select datname from pg_database where datistemplate = false and datname != \'postgres\''))
+        
     return map(lambda x: x.strip(), filter(len, v))
 
 def exists(args, db):
