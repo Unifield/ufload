@@ -112,8 +112,8 @@ def peek_inside_file(path, fn, **kwargs):
         z = zipfile.ZipFile(ufload.httpfile.HttpFile(dav.baseurl+path,
                                                      dav.session.auth[0],
                                                      dav.session.auth[1]))
-    except zipfile.BadZipfile:
-        ufload.progress("Zipfile %s: could not read")
+    except zipfile.BadZipfile as e:
+        ufload.progress("Zipfile %s: could not read: %s" % (fn, e))
         return None
     
     names = z.namelist()
