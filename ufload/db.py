@@ -206,7 +206,7 @@ def delive(args, db):
         return rc
 
     # change the sync config to local
-    rc = psql(args, 'update sync_client_sync_server_connection set protocol = \'xmlrpc\', login = \'admin\', database = \'SYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = 8069;', db)
+    rc = psql(args, 'update sync_client_sync_server_connection set protocol = \'xmlrpc\', login = \'%s\', database = \'SYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = 8069;' % args.adminuser, db)
     if rc != 0:
         return rc
 
@@ -268,7 +268,7 @@ def get_hwid(args):
         import _winreg
         try:
             with _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,
-                                 "SYSTEM\ControlSet001\services\eventlog\Application\openerp-web-6.0",
+                                 "SYSTEM\ControlSet\services\eventlog\Application\openerp-web-6.0",
                                  0, _winreg.KEY_READ) as registry_key:
                 hwid, regtype = _winreg.QueryValueEx(registry_key, "HardwareId")
                 ufload.progress("Hardware id from registry key: %s" % hwid)
