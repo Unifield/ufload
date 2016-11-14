@@ -152,7 +152,11 @@ def _multiRestore(args):
     return 0, dbs
 
 def _syncRestore(args, dbs):
-    sdb = 'SYNC_SERVER_LOCAL'
+    if args.db_prefix:
+        sdb = '%s_SYNC_SERVER_LOCAL' % args.db_prefix
+    else:
+        sdb = 'SYNC_SERVER_LOCAL'
+        
     url = "http://sync-prod_dump.uf5.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
     try:
         r = requests.head(url,
@@ -191,7 +195,7 @@ def _syncLink(args, dbs, sdb):
     # Hook up all the databases we are currently working on
     hwid = ufload.db.get_hwid(args)
     if hwid is None:
-        ufload.progress("No hardware id available, you will need to manually link your instances to SYNC_SERVER_LOCAL.")
+        ufload.progress("No hardware id available, you will need to manually link your instances to %s." % sdb)
         return 0
 
     for db in dbs:
