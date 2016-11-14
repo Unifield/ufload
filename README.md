@@ -70,4 +70,4 @@ Use the remote option in the [logs] section to arrange for remote logging.
 
 Use a command like this to schedule it once a day: ```schtasks /create /F /TN Ufload /SC DAILY /st 20:00 /tr "cmd /C C:\python27\Scripts\ufload restore -load-sync-server"```
 
-Or this to make it run every hour: ```schtasks /create /F /TN Ufload /SC DAILY /RI 60 /st 00:00 /tr "cmd /C C:\python27\Scripts\ufload restore -load-sync-server"```
+Or this to make it run every hour: ```schtasks /create /F /TN Ufload /SC DAILY /RI 60 /st 00:00 /du 24:00 /tr "cmd /C C:\python27\Scripts\ufload restore -load-sync-server"```
