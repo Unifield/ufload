@@ -1,6 +1,4 @@
 import ConfigParser, argparse, os, sys
-import subprocess
-import binascii
 import requests
 import requests.auth
 
@@ -130,7 +128,7 @@ def _multiRestore(args):
             else:
                 ufload.progress("Database %s does not exist, restoring." % db)
             
-            f, sz = ufload.cloud.openDumpInZip(j[0],
+            f, sz = ufload.cloud.openDumpInZip(j[0], j[1],
                                            user=args.user,
                                            pw=args.pw,
                                            where=_ocToDir(args.oc))
@@ -153,8 +151,6 @@ def _multiRestore(args):
 def _syncRestore(args, dbs):
     sdb = 'SYNC_SERVER_LOCAL'
     url = "http://sync-prod_dump.uf5.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
-    up = args.syncuser + ':' + args.syncpw
-
     try:
         r = requests.head(url,
                           auth=requests.auth.HTTPBasicAuth(args.syncuser, args.syncpw))
