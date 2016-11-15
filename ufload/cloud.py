@@ -1,10 +1,10 @@
 # Routines related to ownCloud
 
 import easywebdav
-import datetime, time
+import time
 import zipfile
 import collections
-import logging, re, tempfile
+import logging, tempfile
 
 import ufload
 
@@ -26,8 +26,6 @@ def _get_all_files_and_timestamp(dav, d):
     for f in all_zip:
         if not f.name or f.name[-1] == '/':
             continue
-
-        fn = f.name.split("/")[-1]
 
         # We try to extract a timestamp to get an idea of the creation date
         #  Format: Mon, 14 Mar 2016 03:31:40 GMT
@@ -131,7 +129,7 @@ def dlProgress(pct):
     ufload.progress("Downloaded %d%%" % pct)
 
 # Returns a file-like-object
-def openDumpInZip(path, **kwargs):
+def openDumpInZip(path, fn, **kwargs):
     host, directory = _splitCloudName(kwargs['where'])
     dav = easywebdav.connect(host,
                             username=kwargs['user'],

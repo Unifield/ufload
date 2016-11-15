@@ -1,6 +1,4 @@
 import ConfigParser, argparse, os, sys
-import subprocess
-import binascii
 import requests
 import requests.auth
 
@@ -41,12 +39,15 @@ def _required(args, req):
 
 # Turn
 # ../databases/OCG_MM1_WA-20160831-220427-A-UF2.1-2p3.dump into OCG_MM1_WA_20160831_2204
-def _file_to_db(fn):
+def _file_to_db(args, fn):
     fn = os.path.basename(fn)
     x = fn.split('-')
     if len(x) < 2 or len(x[2]) != 6:
         return None
-    return "_".join([ x[0], x[1], x[2][0:4]])
+    db = "_".join([ x[0], x[1], x[2][0:4]])
+    if args.db_prefix:
+        return args.db_prefix + "_" + db
+    return db
 
 def _cmdRestore(args):
     if args.sync:
@@ -77,7 +78,7 @@ def _fileRestore(args):
             return 3, None
         db = args.i[0]
     else:
-        db = _file_to_db(args.file)
+        db = _file_to_db(args, args.file)
         if db is None:
             ufload.progress("Could not set the instance from the filename. Use -i to specify it.")
             return 3, None
@@ -123,21 +124,21 @@ def _multiRestore(args):
                 # no dump inside of zip, try the next one
                 continue
 
-            db = _file_to_db(str(n))
+            db = _file_to_db(args, str(n))
             if ufload.db.exists(args, db):
                 ufload.progress("Database %s already exists." % db)
                 break
             else:
                 ufload.progress("Database %s does not exist, restoring." % db)
             
-            f, sz = ufload.cloud.openDumpInZip(j[0],
+            f, sz = ufload.cloud.openDumpInZip(j[0], j[1],
                                            user=args.user,
                                            pw=args.pw,
                                            where=_ocToDir(args.oc))
             if f is None:
                 continue
             
-            db = _file_to_db(f.name)
+            db = _file_to_db(args, f.name)
             if db is None:
                 ufload.progress("Bad filename %s. Skipping." % f.name)
                 continue
@@ -151,10 +152,12 @@ def _multiRestore(args):
     return 0, dbs
 
 def _syncRestore(args, dbs):
-    sdb = 'SYNC_SERVER_LOCAL'
+    if args.db_prefix:
+        sdb = '%s_SYNC_SERVER_LOCAL' % args.db_prefix
+    else:
+        sdb = 'SYNC_SERVER_LOCAL'
+        
     url = "http://sync-prod_dump.uf5.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
-    up = args.syncuser + ':' + args.syncpw
-
     try:
         r = requests.head(url,
                           auth=requests.auth.HTTPBasicAuth(args.syncuser, args.syncpw))
@@ -192,7 +195,7 @@ def _syncLink(args, dbs, sdb):
     # Hook up all the databases we are currently working on
     hwid = ufload.db.get_hwid(args)
     if hwid is None:
-        ufload.progress("No hardware id available, you will need to manually link your instances to SYNC_SERVER_LOCAL.")
+        ufload.progress("No hardware id available, you will need to manually link your instances to %s." % sdb)
         return 0
 
     for db in dbs:
@@ -239,6 +242,7 @@ def parse():
     parser.add_argument("-db-port", help="Postgres port")
     parser.add_argument("-db-user", help="Postgres user")
     parser.add_argument("-db-pw", help="Postgres password")
+    parser.add_argument("-db-prefix", help="Prefix to put on database names")
     parser.add_argument("-remote", help="Remote log server")
 
     sub = parser.add_subparsers(title='subcommands',

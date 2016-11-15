@@ -196,7 +196,8 @@ def delive(args, db):
         return 0
     
     # set the username of the admin account
-    rc = psql(args, 'update res_users set login = \'%s\' where id = 1;' % args.adminuser, db)
+    adminuser = args.adminuser.lower()
+    rc = psql(args, 'update res_users set login = \'%s\' where id = 1;' % adminuser, db)
     if rc != 0:
         return rc
 
@@ -206,7 +207,7 @@ def delive(args, db):
         return rc
 
     # change the sync config to local
-    rc = psql(args, 'update sync_client_sync_server_connection set protocol = \'xmlrpc\', login = \'admin\', database = \'SYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = 8069;', db)
+    rc = psql(args, 'update sync_client_sync_server_connection set protocol = \'xmlrpc\', login = \'%s\', database = \'SYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = 8069;' % adminuser, db)
     if rc != 0:
         return rc
 
@@ -268,7 +269,7 @@ def get_hwid(args):
         import _winreg
         try:
             with _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,
-                                 "SYSTEM\ControlSet001\services\eventlog\Application\openerp-web-6.0",
+                                 "SYSTEM\ControlSet\services\eventlog\Application\openerp-web-6.0",
                                  0, _winreg.KEY_READ) as registry_key:
                 hwid, regtype = _winreg.QueryValueEx(registry_key, "HardwareId")
                 ufload.progress("Hardware id from registry key: %s" % hwid)
@@ -313,12 +314,16 @@ def clean(args, dbs):
     return 0            
 
 def _allDbs(args):
-    v = _run_out(args, mkpsql(args, 'select datname from pg_database where datistemplate = false and datname != \'postgres\''))
+    if args.db_user:
+        v = _run_out(args, mkpsql(args, 'select datname from pg_database where datdba=(select usesysid from pg_user where usename=\'%s\') and datistemplate = false and datname != \'postgres\'' % args.db_user))
+    else:
+        v = _run_out(args, mkpsql(args, 'select datname from pg_database where datistemplate = false and datname != \'postgres\''))
+        
     return map(lambda x: x.strip(), filter(len, v))
 
 def exists(args, db):
     v = _run_out(args, mkpsql(args, 'select datname from pg_database where datname = \'%s\'' % db))
-    v = map(lambda x: x.strip(), filter(len, v))
+    v = filter(len, map(lambda x: x.strip(), v))
     return len(v)==1 and v[0] == db
 
 # These two functions read and write from a little "about" table
