@@ -207,7 +207,11 @@ def delive(args, db):
         return rc
 
     # change the sync config to local
-    rc = psql(args, 'update sync_client_sync_server_connection set protocol = \'xmlrpc\', login = \'%s\', database = \'SYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = 8069;' % adminuser, db)
+    if args.db_prefix:
+        pfx = args.db_prefix
+    else:
+        pfx = ''
+    rc = psql(args, 'update sync_client_sync_server_connection set protocol = \'xmlrpc\', login = \'%s\', database = \'%sSYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = 8069;' % (adminuser, pfx), db)
     if rc != 0:
         return rc
 
@@ -287,11 +291,13 @@ def get_hwid(args):
         hw_hash = hashlib.md5(''.join(mac)).hexdigest()
         return hw_hash
 
-def _db_to_instance(db):
+def _db_to_instance(args, db):
+    if args.db_prefix:
+        db = db[len(args.db_prefix)+1:]
     return '_'.join(db.split('_')[0:-2])
 
 def sync_link(args, hwid, db, sdb):
-    return psql(args, 'update sync_server_entity set hardware_id = \'%s\' where name = \'%s\';' % (hwid, _db_to_instance(db)), sdb)
+    return psql(args, 'update sync_server_entity set hardware_id = \'%s\' where name = \'%s\';' % (hwid, _db_to_instance(args, db)), sdb)
 
 # Remove all databases which come from the same instance as one of the instances
 # in dbs, but which are not in dbs.
@@ -299,12 +305,12 @@ def clean(args, dbs):
     toClean = {}
     toKeep = {}
     for d in dbs:
-        i = _db_to_instance(d)
+        i = _db_to_instance(args, d)
         toClean[i] = True
         toKeep[d] = True
         
     for d in _allDbs(args):
-        i = _db_to_instance(d)
+        i = _db_to_instance(args, d)
         if d not in toKeep and i in toClean:
             ufload.progress("Cleaning other database for instance %s: %s" % (i, d))
             killCons(args, d)
