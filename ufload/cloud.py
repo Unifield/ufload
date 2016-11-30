@@ -148,17 +148,17 @@ def openDumpInZip(path, fn, **kwargs):
         dav.download(path, sf)
     except Exception as e:
         logging.warn("Could not download file: " + str(e))
-        return None
+        return None, 0
     
     tf.seek(0, 0)
     z = zipfile.ZipFile(tf)
     names = z.namelist()
     if len(names) == 0:
         logging.warn("Zipfile %s has no files in it." % fn)
-        return None
+        return None, 0
     if len(names) != 1:
         logging.warn("Zipfile %s has unexpected files in it: %s" % (fn, names))
-        return None
+        return None, 0
     return z.open(names[0]), z.getinfo(names[0]).file_size
 
 # An object that copies input to output, calling
