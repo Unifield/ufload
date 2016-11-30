@@ -2,8 +2,11 @@ import os, sys, subprocess, tempfile, hashlib
 import ufload
 
 def _run_out(args, cmd):
-    return subprocess.check_output(cmd, env=pg_pass(args), stderr=subprocess.STDOUT).split('\n')
-        
+    try:
+        return subprocess.check_output(cmd, env=pg_pass(args), stderr=subprocess.STDOUT).split('\n')
+    except:
+        return []
+
 def _run(args, cmd, silent=False):
     if args.show:
         ufload.progress("Would run: " + str(cmd))
@@ -305,7 +308,7 @@ def clean(args, dbs):
         
     for d in _allDbs(args):
         i = _db_to_instance(d)
-        if d not in toKeep and i in toClean:
+        if i and d not in toKeep and i in toClean:
             ufload.progress("Cleaning other database for instance %s: %s" % (i, d))
             killCons(args, d)
             rc = psql(args, 'DROP DATABASE IF EXISTS \"%s\"'%d)
