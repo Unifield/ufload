@@ -341,6 +341,8 @@ def exists(args, db):
 def get_sync_server_len(args, db='SYNC_SERVER_LOCAL'):
     try:
         l = _run_out(args, mkpsql(args, 'select length from about', db))
+        if len(l) < 1:
+            return -1
         return int(filter(len, l)[0])
     except subprocess.CalledProcessError:
         pass
