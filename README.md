@@ -20,8 +20,8 @@ ufload can make coffee for you in the morning, and then do your dishes.
 ## Installing on Windows
 
 1. Install Python 2.7 from here: https://www.python.org/downloads/windows/
-2. Add these directories to your PATH, separated by semi-colons:
-  * c:\Python27
+2. Add this directory to your PATH, separated from previous ones
+by a semi-colon:
   * c:\Python27\Scripts
 3. In a new CMD.EXE window, type: ```pip install --upgrade ufload```
 4. Run ```ufload -h``` to get help.
