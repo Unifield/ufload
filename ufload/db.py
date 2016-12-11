@@ -302,16 +302,15 @@ def _db_to_instance(args, db):
 def sync_link(args, hwid, db, sdb):
     return psql(args, 'update sync_server_entity set hardware_id = \'%s\' where name = \'%s\';' % (hwid, _db_to_instance(args, db)), sdb)
 
-# Remove all databases which come from the same instance as one of the instances
-# in dbs, but which are not in dbs.
-def clean(args, dbs):
+# Remove all databases which come from the same instance as db
+def clean(args, db):
     toClean = {}
     toKeep = {}
-    for d in dbs:
-        i = _db_to_instance(args, d)
-        toClean[i] = True
-        toKeep[d] = True
-        
+
+    i = _db_to_instance(args, db)
+    toClean[i] = True
+    toKeep[db] = True
+
     for d in _allDbs(args):
         i = _db_to_instance(args, d)
         if i and d not in toKeep and i in toClean:

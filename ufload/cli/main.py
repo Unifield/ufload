@@ -65,9 +65,6 @@ def _cmdRestore(args):
     if args.sync:
         rc = _syncRestore(args, dbs)
 
-    if not args.noclean:
-        rc = ufload.db.clean(args, dbs)
-        
     return rc
 
 def _fileRestore(args):
@@ -91,6 +88,10 @@ def _fileRestore(args):
 
     with open(args.file, 'rb') as f:
         rc = ufload.db.load_into(args, db, f, statinfo.st_size)
+
+    if not args.noclean:
+        rc = ufload.db.clean(args, db)
+        
     if rc == 0:
         return 0, [ db ]
     else:
@@ -145,8 +146,12 @@ def _multiRestore(args):
             
             rc = ufload.db.load_into(args, db, f, sz)
             if rc == 0:
-                # We got a good load, so go to the next instance.
                 dbs.append(db)
+                
+                if not args.noclean:
+                    rc = ufload.db.clean(args, db)
+        
+                # We got a good load, so go to the next instance.
                 break
 
     return 0, dbs
