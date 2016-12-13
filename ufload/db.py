@@ -255,6 +255,12 @@ def ver(args):
     return v
 
 def killCons(args, db):
+    # A wacky exception for UF5: we are not superuser on Postgres, so we
+    # cannot kill connections. So bounce OpenERP instead.
+    if args.killconn:
+        _run(args, [ 'sh', '-c', args.killconn])
+        return
+
     # For Postgres 8, it is procpid, for 9 it is pid
     v = ver(args)
     if len(v) > 1 and ' 9.' in v[0]:

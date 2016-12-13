@@ -91,7 +91,7 @@ def _fileRestore(args):
 
     if not args.noclean:
         rc = ufload.db.clean(args, db)
-        
+
     if rc == 0:
         return 0, [ db ]
     else:
@@ -131,26 +131,26 @@ def _multiRestore(args):
                 break
             else:
                 ufload.progress("Database %s does not exist, restoring." % db)
-            
+
             f, sz = ufload.cloud.openDumpInZip(j[0], j[1],
                                            user=args.user,
                                            pw=args.pw,
                                            where=_ocToDir(args.oc))
             if f is None:
                 continue
-            
+
             db = _file_to_db(args, f.name)
             if db is None:
                 ufload.progress("Bad filename %s. Skipping." % f.name)
                 continue
-            
+
             rc = ufload.db.load_into(args, db, f, sz)
             if rc == 0:
                 dbs.append(db)
-                
+
                 if not args.noclean:
                     rc = ufload.db.clean(args, db)
-        
+
                 # We got a good load, so go to the next instance.
                 break
 
@@ -161,7 +161,7 @@ def _syncRestore(args, dbs):
         sdb = '%s_SYNC_SERVER_LOCAL' % args.db_prefix
     else:
         sdb = 'SYNC_SERVER_LOCAL'
-        
+
     url = "http://sync-prod_dump.uf5.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
     try:
         r = requests.head(url,
@@ -174,14 +174,14 @@ def _syncRestore(args, dbs):
     except Exception as  e:
         ufload.progress("Failed to fetch sync server: " + str(e))
         return 1
-    
+
     sz = int(r.headers.get('content-length', 0))
     szdb = ufload.db.get_sync_server_len(args, sdb)
 
     if szdb == sz:
         ufload.progress("Sync server is up to date.")
         return 0
-    
+
     r = requests.get(url,
                      auth=requests.auth.HTTPBasicAuth(args.syncuser, args.syncpw),
                      stream=True)
@@ -230,7 +230,7 @@ def _cmdLs(args):
             print ": ".join((j[1], str(n)))
             # only show the latest for each one
             break
-        
+
     return 0
 
 def parse():
@@ -248,6 +248,7 @@ def parse():
     parser.add_argument("-db-user", help="Postgres user")
     parser.add_argument("-db-pw", help="Postgres password")
     parser.add_argument("-db-prefix", help="Prefix to put on database names")
+    parser.add_argument("-killconn", help="The command to run kill connections to the databases.")
     parser.add_argument("-remote", help="Remote log server")
 
     sub = parser.add_subparsers(title='subcommands',
@@ -266,7 +267,7 @@ def parse():
     pRestore.add_argument("-adminpw", default='admin', help="the password to set into the newly restored database")
     pRestore.add_argument("-live", dest='live', action='store_true', help="do not take the normal actions to make a restore into a non-production instance")
     pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
-    pRestore.add_argument("-load-sync-server", dest='sync', action='store_true', help="set up a local sync server")    
+    pRestore.add_argument("-load-sync-server", dest='sync', action='store_true', help="set up a local sync server")
     pRestore.set_defaults(func=_cmdRestore)
 
     # read from $HOME/.ufload first
@@ -275,7 +276,7 @@ def parse():
         conffile.read('%s/ufload.txt' % _home())
     else:
         conffile.read('%s/.ufload' % _home())
-        
+
     for subp, subn in ((parser, "owncloud"),
                        (parser, "postgres"),
                        (parser, "logs"),
@@ -302,5 +303,5 @@ def main():
         ufload.progress("Will exit with result code: %d" % rc)
         ufload.progress("Posting logs to remote server.")
         requests.post(args.remote+"?who=%s"%hostname, data='\n'.join(_logs))
-    
+
     sys.exit(rc)
