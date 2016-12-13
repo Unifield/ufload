@@ -71,3 +71,27 @@ Use the remote option in the [logs] section to arrange for remote logging.
 Use a command like this to schedule it once a day: ```schtasks /create /F /TN Ufload /SC DAILY /st 20:00 /tr "cmd.exe /C start /min cmd.exe /C C:\python27\Scripts\ufload restore -load-sync-server"```
 
 Or this to make it run every hour: ```schtasks /create /F /TN Ufload /SC DAILY /RI 60 /st 00:00 /du 24:00 /tr "cmd.exe /C start /min cmd.exe /C C:\python27\Scripts\ufload restore -load-sync-server"```
+
+## Integrating other tools into ufload
+
+Ufload's ```restore``` command has a ```-notify``` flag which will
+call a program each time a database is sucessfully loaded. The program
+receives the name of the newly loaded database as it's first argument.
+
+For instance, the following script sends e-mail when a backup file is
+older than expected:
+
+```
+#!/bin/sh
+
+# Convert OCG_NE1_COO_20161210_2102 into 20161210
+d=`echo $1 | perl -F_ -lane 'print $F[-2]'`
+limit=`date --date='5 days ago' +%Y%m%d`
+
+if [ $d -lt $limit ]; then
+   echo "Database $db is too old." | mail user@example.org
+fi
+```
+
+If it was loaded in ```/bin/notify-old-db```, then
+```ufload restore -notify /bin/notify-old-db``` will run the script.

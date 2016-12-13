@@ -356,3 +356,46 @@ def get_sync_server_len(args, db='SYNC_SERVER_LOCAL'):
 def write_sync_server_len(args, l, db='SYNC_SERVER_LOCAL'):
     _run_out(args, mkpsql(args, 'drop table if exists about; create table about ( length int ); insert into about values ( %d )' % l, db))
 
+def _parse_dsn(dsn):
+    res = {}
+    for i in dsn.split():
+        k,v = i.split("=")
+        res[k]=v
+    return res
+
+# Copy new data from one database (identified via a DSN) to the 'archive' db
+# of the current Postgres (as specified by the --db_host, etc)
+def archive(args):
+    x = _parse_dsn(args.from_dsn)
+    
+    v = ver(args)
+    if len(v) < 1 or '9.5' not in v[0]:
+        ufload.progress('Postgres 9.5 is required.')
+        return 1
+    
+    ufload.progress("Archive operations_event from %s" % x['dbname'])
+    _run_out(args, mkpsql(args, '''
+create extension if not exists dblink;
+insert into operations_event (instance, kind, time, remote_id, data)
+  select * from
+    dblink('%s', 'select instance, kind, time, id, data from operations_event') as
+    table_name_is_ignored(instance character varying(64),
+       kind character varying(64),
+       time timestamp without time zone,
+       id integer,
+       data text)
+    on conflict do nothing;''' % (args.from_dsn,), 'archive'))
+
+    ufload.progress("Archive operations_count from %s" % x['dbname'])
+    _run_out(args, mkpsql(args, '''
+create extension if not exists dblink;
+insert into operations_count (instance, kind, time, count, remote_id)
+  select * from
+    dblink('%s', 'select instance, kind, time, count, id from operations_count') as
+    table_name_is_ignored(instance character varying(64),
+       kind character varying(64),
+       time timestamp without time zone,
+       count integer,
+       id integer)
+    on conflict do nothing;''' % (args.from_dsn,), 'archive'))
+

@@ -1,6 +1,7 @@
 import ConfigParser, argparse, os, sys
 import requests
 import requests.auth
+import subprocess
 
 import ufload
 
@@ -49,6 +50,11 @@ def _file_to_db(args, fn):
         return args.db_prefix + "_" + db
     return db
 
+def _cmdArchive(args):
+    if not _required(args, [ 'from_dsn' ]):
+        return 2
+    return ufload.db.archive(args)
+
 def _cmdRestore(args):
     if args.sync:
         if not _required(args, [ 'syncuser', 'syncpw' ]):
@@ -91,6 +97,9 @@ def _fileRestore(args):
 
     if not args.noclean:
         rc = ufload.db.clean(args, db)
+
+    if args.notify:
+        subprocess.call([ args.notify, db ])
 
     if rc == 0:
         return 0, [ db ]
@@ -150,6 +159,9 @@ def _multiRestore(args):
 
                 if not args.noclean:
                     rc = ufload.db.clean(args, db)
+
+                if args.notify:
+                    subprocess.call([ args.notify, db ])
 
                 # We got a good load, so go to the next instance.
                 break
@@ -250,6 +262,7 @@ def parse():
     parser.add_argument("-db-prefix", help="Prefix to put on database names")
     parser.add_argument("-killconn", help="The command to run kill connections to the databases.")
     parser.add_argument("-remote", help="Remote log server")
+    parser.add_argument("-n", dest='show', action='store_true', help="no real work; only show what would happen")
 
     sub = parser.add_subparsers(title='subcommands',
                                 description='valid subcommands',
@@ -261,14 +274,18 @@ def parse():
 
     pRestore = sub.add_parser('restore', help="Restore a database from ownCloud or a file")
     pRestore.add_argument("-i", action="append", help="instances to work on (matched as a substring)")
-    pRestore.add_argument("-n", dest='show', action='store_true', help="no real work; only show what would happen")
     pRestore.add_argument("-file", help="the file to restore (disabled ownCloud downloading)")
     pRestore.add_argument("-adminuser", default='admin', help="the new admin username in the newly restored database")
     pRestore.add_argument("-adminpw", default='admin', help="the password to set into the newly restored database")
     pRestore.add_argument("-live", dest='live', action='store_true', help="do not take the normal actions to make a restore into a non-production instance")
     pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
     pRestore.add_argument("-load-sync-server", dest='sync', action='store_true', help="set up a local sync server")
+    pRestore.add_argument("-notify", dest='notify', help="run this script on each restored database")
     pRestore.set_defaults(func=_cmdRestore)
+    
+    pArchive = sub.add_parser('archive', help="Copy new data into the database.")
+    pArchive.add_argument("-from-dsn", help="the database to copy from (in the form of a DSN: 'hostaddr=x dbname=x user=x password=x')")
+    pArchive.set_defaults(func=_cmdArchive)
 
     # read from $HOME/.ufload first
     conffile = ConfigParser.SafeConfigParser()
@@ -282,7 +299,8 @@ def parse():
                        (parser, "logs"),
                        (parser, "sync"),
                        (pLs, "ls"),
-                       (pRestore, "restore")):
+                       (pRestore, "restore"),
+                       (pArchive, "archive")):
         if conffile.has_section(subn):
             subp.set_defaults(**dict(conffile.items(subn)))
 
