@@ -84,11 +84,13 @@ older than expected:
 ```
 #!/bin/sh
 
+db=$1
+
 # Convert OCG_NE1_COO_20161210_2102 into 20161210
-d=`echo $1 | perl -F_ -lane 'print $F[-2]'`
+d=`echo $db | perl -F_ -lane 'print $F[-2]'`
 limit=`date --date='5 days ago' +%Y%m%d`
 
-if [ $d -lt $limit ]; then
+if [ "$d" -lt "$limit" ]; then
    echo "Database $db is too old." | mail user@example.org
 fi
 ```
