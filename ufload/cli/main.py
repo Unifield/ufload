@@ -34,7 +34,8 @@ def _required(args, req):
     err = 0
     for r in req:
         if getattr(args, r) is None:
-            ufload.progress('Argument %s is required for this sub-command.' % r)
+            r = r.replace("_", "-")
+            ufload.progress('Argument --%s is required for this sub-command.' % r)
             err += 1
     return err == 0
 
@@ -284,7 +285,7 @@ def parse():
     pRestore.set_defaults(func=_cmdRestore)
     
     pArchive = sub.add_parser('archive', help="Copy new data into the database.")
-    pArchive.add_argument("-from-dsn", help="the database to copy from (in the form of a DSN: 'hostaddr=x dbname=x user=x password=x')")
+    pArchive.add_argument("-from-dsn", action="append", help="the database to copy from (in the form of a DSN: 'hostaddr=x dbname=x user=x password=x')")
     pArchive.set_defaults(func=_cmdArchive)
 
     # read from $HOME/.ufload first

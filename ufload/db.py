@@ -7,17 +7,18 @@ def _run_out(args, cmd):
     except:
         return []
 
-def _run(args, cmd, silent=False):
+def _run(args, cmd, get_out=False, silent=False):
     if args.show:
         ufload.progress("Would run: " + str(cmd))
         rc = 0
     else:
-        if silent:
+        if silent or get_out:
+            out = ""
             try:
-                subprocess.check_output(cmd, env=pg_pass(args), stderr=subprocess.STDOUT)
-            except:
-                pass
-            rc=0
+                out = subprocess.check_output(cmd, env=pg_pass(args), stderr=subprocess.STDOUT)
+                return 0, out
+            except subprocess.CalledProcessError as exc:
+                return exc.returncode, exc.output
         else:
             rc = subprocess.call(cmd, env=pg_pass(args))
     return rc
@@ -282,7 +283,7 @@ def get_hwid(args):
         import _winreg
         try:
             with _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,
-                                 "SYSTEM\ControlSet\services\eventlog\Application\openerp-web-6.0",
+                                 "SYSTEM\ControlSet001\services\eventlog\Application\openerp-web-6.0",
                                  0, _winreg.KEY_READ) as registry_key:
                 hwid, regtype = _winreg.QueryValueEx(registry_key, "HardwareId")
                 ufload.progress("Hardware id from registry key: %s" % hwid)
@@ -366,15 +367,19 @@ def _parse_dsn(dsn):
 # Copy new data from one database (identified via a DSN) to the 'archive' db
 # of the current Postgres (as specified by the --db_host, etc)
 def archive(args):
-    x = _parse_dsn(args.from_dsn)
-    
     v = ver(args)
     if len(v) < 1 or '9.5' not in v[0]:
         ufload.progress('Postgres 9.5 is required.')
         return 1
+
+    for dsn in args.from_dsn:
+        x = _parse_dsn(dsn)
+        if 'dbname' not in x:
+            ufload.progress('DSN is missing dbname.')
+            return 1
     
-    ufload.progress("Archive operations_event from %s" % x['dbname'])
-    _run_out(args, mkpsql(args, '''
+        ufload.progress("Archive operations_event from %s" % x['dbname'])
+        rc, out = _run(args, mkpsql(args, '''
 create extension if not exists dblink;
 insert into operations_event (instance, kind, time, remote_id, data)
   select * from
@@ -384,10 +389,11 @@ insert into operations_event (instance, kind, time, remote_id, data)
        time timestamp without time zone,
        id integer,
        data text)
-    on conflict do nothing;''' % (args.from_dsn,), 'archive'))
+    on conflict do nothing;''' % (dsn,), 'archive'), get_out=True)
+        ufload.progress(_clean(out))
 
-    ufload.progress("Archive operations_count from %s" % x['dbname'])
-    _run_out(args, mkpsql(args, '''
+        ufload.progress("Archive operations_count from %s" % x['dbname'])
+        rc, out = _run(args, mkpsql(args, '''
 create extension if not exists dblink;
 insert into operations_count (instance, kind, time, count, remote_id)
   select * from
@@ -397,5 +403,15 @@ insert into operations_count (instance, kind, time, count, remote_id)
        time timestamp without time zone,
        count integer,
        id integer)
-    on conflict do nothing;''' % (args.from_dsn,), 'archive'))
+    on conflict do nothing;''' % (dsn,), 'archive'), get_out=True)
+        ufload.progress(_clean(out))
 
+def _clean(out):
+    ret = ''
+    for line in out.split("\n"):
+        if line == "":
+            continue
+        if line.startswith("NOTICE:"):
+            continue
+        ret += line + "\n"
+    return ret
