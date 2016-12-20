@@ -210,12 +210,23 @@ def delive(args, db):
     if rc != 0:
         return rc
 
+    port = 8069
+
     # change the sync config to local
     if args.db_prefix:
-        pfx = args.db_prefix
+        pfx = args.db_prefix + '_'
+
+        # This is a gross hack, but it is the easiest way to find these
+        # different port numbers per runbot.
+        if args.db_prefix == 'oca':
+            port = 16983
+        if args.db_prefix == 'ocb':
+            port = 16993
+        if args.db_prefix == 'ocg':
+            port = 16963
     else:
         pfx = ''
-    rc = psql(args, 'update sync_client_sync_server_connection set protocol = \'xmlrpc\', login = \'%s\', database = \'%sSYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = 8069;' % (adminuser, pfx), db)
+    rc = psql(args, 'update sync_client_sync_server_connection set protocol = \'xmlrpc\', login = \'%s\', database = \'%sSYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, port), db)
     if rc != 0:
         return rc
 
@@ -407,11 +418,11 @@ insert into operations_count (instance, kind, time, count, remote_id)
         ufload.progress(_clean(out))
 
 def _clean(out):
-    ret = ''
+    ret = []
     for line in out.split("\n"):
-        if line == "":
+        if line.strip() == "":
             continue
         if line.startswith("NOTICE:"):
             continue
-        ret += line + "\n"
-    return ret
+        ret.append(line)
+    return "\n".join(ret)
