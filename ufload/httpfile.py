@@ -20,19 +20,16 @@ class HttpFile(object):
 
     def read(self, count=-1):
         if count < 0:
-            end = self.size() - 1
-        else:
-            end = self.offset + count - 1
+            count = self.size() - self.offset
+        end = self.offset + count - 1
         h = { 'Range': "bytes=%s-%s" % (self.offset, end) }
         r = requests.get(self.url, auth=(self.user, self.pw), headers=h)
         if not r.ok:
             raise RuntimeError("status code " + str(r.status_code))
-        data = r.content
-        chunk = len(data)
-        if count >= 0:
-            assert chunk == count
-        self.offset += chunk
-        return data
+        if len(r.content) < count:
+            raise RuntimeError("wanted %d bytes, got %d bytes" % (count, len(r.content)))
+        self.offset += count
+        return r.content[0:count]
 
     def seek(self, offset, whence=0):
         if whence == 0:
