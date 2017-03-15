@@ -70,7 +70,7 @@ def _group_files_to_download(files):
         isplit = f.rindex('/')
         filename = f[isplit+1:]
         if '-' not in filename:
-            ufload.progress("unexpected filename: "+ filename)
+            ufload.progress("filename is missing expected dash: "+ filename)
             continue
 
         instance = '-'.join(filename.split('-')[:-1])

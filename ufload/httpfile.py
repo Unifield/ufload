@@ -15,7 +15,12 @@ class HttpFile(object):
             r = requests.head(self.url, auth=(self.user, self.pw))
             if not r.ok:
                 raise RuntimeError("status code " + str(r.status_code))
-            self._size = int(r.headers["Content-length"])
+            if "content-length" in r.headers:
+                self._size = int(r.headers["content-length"])
+            else:
+                # We've seen that ownCloud seems to omit content-length
+                # when the file is empty.
+                self._size = 0
         return self._size
 
     def read(self, count=-1):

@@ -26,6 +26,8 @@ def _ocToDir(oc):
         return 'OCB_Backups'
     elif x == 'ocg':
         return 'OCG_Backups'
+    elif x == 'ocp':
+        return 'OCP_Backups'
     else:
         # no OC abbrev, assume this is a real directory name
         return oc
