@@ -199,17 +199,7 @@ def delive(args, db):
         ufload.progress("*** WARNING: The restored database has LIVE passwords and LIVE syncing.")
         return 0
     
-    # set the username of the admin account
     adminuser = args.adminuser.lower()
-    rc = psql(args, 'update res_users set login = \'%s\' where id = 1;' % adminuser, db)
-    if rc != 0:
-        return rc
-
-    # put the chosen password into all users
-    rc = psql(args, 'update res_users set password = \'%s\';' % args.adminpw, db)
-    if rc != 0:
-        return rc
-
     port = 8069
 
     # change the sync config to local
@@ -248,6 +238,20 @@ def delive(args, db):
         directory = '\'/tmp\''
     
     rc = psql(args, 'update backup_config set beforemanualsync=\'f\', beforepatching=\'f\', aftermanualsync=\'f\', beforeautomaticsync=\'f\', afterautomaticsync=\'f\', name = %s;' % directory, db)
+    if rc != 0:
+        return rc
+
+    if args.nopwreset:
+        ufload.progress("*** WARNING: The restored database has LIVE passwords.")
+	return 0
+
+    # set the username of the admin account
+    rc = psql(args, 'update res_users set login = \'%s\' where id = 1;' % adminuser, db)
+    if rc != 0:
+        return rc
+
+    # put the chosen password into all users
+    rc = psql(args, 'update res_users set password = \'%s\';' % args.adminpw, db)
     if rc != 0:
         return rc
 

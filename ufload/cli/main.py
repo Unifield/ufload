@@ -280,6 +280,7 @@ def parse():
     pRestore.add_argument("-file", help="the file to restore (disabled ownCloud downloading)")
     pRestore.add_argument("-adminuser", default='admin', help="the new admin username in the newly restored database")
     pRestore.add_argument("-adminpw", default='admin', help="the password to set into the newly restored database")
+    pRestore.add_argument("-nopwreset", dest='nopwreset', action='store_true', help="do not change any passwords")
     pRestore.add_argument("-live", dest='live', action='store_true', help="do not take the normal actions to make a restore into a non-production instance")
     pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
     pRestore.add_argument("-load-sync-server", dest='sync', action='store_true', help="set up a local sync server")
