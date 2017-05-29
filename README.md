@@ -25,7 +25,7 @@ by a semi-colon:
   * c:\Python27\Scripts
 3. In a new CMD.EXE window, type: ```pip install --upgrade ufload```
 4. Run ```ufload -h``` to get help.
-5. Use Notepad to create a config file. Put the file in the same place CMD.EXE starts from, for example ```d:\Users\jae```. The file should be named ufload.txt. Put the following into it:
+5. Use Notepad to create a config file. Put the file in the same place CMD.EXE starts from, for example ```d:\Users\jae```. The file should be named ufload.txt. Be careful: notepad.exe will create a file called ufload.txt.txt by default. To avoid this, use "Save as..." and do not include .txt. Put the following into it:
 ```
 [owncloud]
 user=username
@@ -36,6 +36,7 @@ oc=which OC's backups you are using: OCG, OCA, or OCB
 db_user=openpg
 db_pw=your database password
 ```
+6. Use "dir" to confirm that the file is where you expect it to be, and is named "ufload.txt" and not "ufload.txt.txt".
 
 For each line, put the right thing. If you do not want to put your
 password in the file, you can add the ```-pw``` flag to any command,
