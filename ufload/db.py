@@ -24,11 +24,12 @@ def _run(args, cmd, get_out=False, silent=False):
     return rc
 
 # Find exe by looking in the PATH, prefering the one
-# installed by the AIO.
+# installed by the AIO (UF6.0 style or pre-UF6 style)
 def _find_exe(exe):
     if sys.platform == "win32":
-        path = [ 'D:\\MSF Data\\Unifield\\PostgreSQL\\bin',
-                 os.environ['PATH'].split(';') ]
+        path = [ r'c:\Program Files (x86)\msf\Unifield\pgsql\bin',
+                 r'd:\MSF Data\Unifield\PostgreSQL\bin' ]
+        path.extend(os.environ['PATH'].split(';'))
         bin = exe+".exe"
     else:
         path = os.environ['PATH'].split(':')
