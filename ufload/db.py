@@ -210,11 +210,11 @@ def delive(args, db):
         # This is a gross hack, but it is the easiest way to find these
         # different port numbers per runbot.
         if args.db_prefix == 'oca':
-            port = 16983
+            port = 12183
         if args.db_prefix == 'ocb':
-            port = 16993
+            port = 12173
         if args.db_prefix == 'ocg':
-            port = 16963
+            port = 12153
     else:
         pfx = ''
     rc = psql(args, 'update sync_client_sync_server_connection set protocol = \'xmlrpc\', login = \'%s\', database = \'%sSYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, port), db)
