@@ -212,6 +212,9 @@ def _syncRestore(args, dbs):
 
 # separate function to make testing easier
 def _syncLink(args, dbs, sdb):
+    # Arrange that all instances use admin as the sync user
+    ufload.db.sync_server_all_admin(args, sdb)
+
     # Hook up all the databases we are currently working on
     hwid = ufload.db.get_hwid(args)
     if hwid is None:

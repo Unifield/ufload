@@ -217,7 +217,7 @@ def delive(args, db):
             port = 12153
     else:
         pfx = ''
-    rc = psql(args, 'update sync_client_sync_server_connection set protocol = \'xmlrpc\', login = \'%s\', database = \'%sSYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, port), db)
+    rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = f, protocol = \'xmlrpc\', login = \'%s\', database = \'%sSYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, port), db)
     if rc != 0:
         return rc
 
@@ -372,6 +372,9 @@ def get_sync_server_len(args, db='SYNC_SERVER_LOCAL'):
 
 def write_sync_server_len(args, l, db='SYNC_SERVER_LOCAL'):
     _run_out(args, mkpsql(args, 'drop table if exists about; create table about ( length int ); insert into about values ( %d )' % l, db))
+
+def sync_server_all_admin(args, db='SYNC_SERVER_LOCAL'):
+    _run_out(args, mkpsql(args, 'update sync_server_entity set user_id = 1;', db))
 
 def _parse_dsn(dsn):
     res = {}
