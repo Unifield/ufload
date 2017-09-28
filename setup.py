@@ -56,6 +56,7 @@ setup(
     [console_scripts]
     ufload=ufload.cli.main:main
     """,
+    python_requires = ">=2.7",
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Environment :: Console',

@@ -92,11 +92,11 @@ def list_files(**kwargs):
 
     inst = []
     if kwargs['instances'] is not None:
-        inst = kwargs['instances']
+        inst = [x.lower() for x in kwargs['instances']]
 
     ret = {}
     for i in all:
-        if _match_any_wildcard(inst, i):
+        if _match_any_wildcard(inst, i.lower()):
             ret[i] = all[i]
     return ret
 
