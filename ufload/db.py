@@ -217,7 +217,7 @@ def delive(args, db):
             port = 12153
     else:
         pfx = ''
-    rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = f, protocol = \'xmlrpc\', login = \'%s\', database = \'%sSYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, port), db)
+    rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = \'f\', protocol = \'xmlrpc\', login = \'%s\', database = \'%sSYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, port), db)
     if rc != 0:
         return rc
 
