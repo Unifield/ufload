@@ -22,7 +22,9 @@ ufload can make coffee for you in the morning, and then do your dishes.
 1. Install Python 2.7 from here: https://www.python.org/downloads/windows/
 2. Add this directory to your PATH, separated from previous ones
 by a semi-colon:
-  * c:\Python27\Scripts
+  * ;C:\Python27;C:\Python27\Scripts
+  or with cmd line in windows:
+   ```SETX /M PATH "%PATH%;C:\Python27;C:\Python27\Scripts"```
 3. In a new CMD.EXE window, type: ```pip install --upgrade ufload```
 4. Run ```ufload -h``` to get help.
 5. Use Notepad to create a config file. Put the file in the same place CMD.EXE starts from, for example ```d:\Users\jae```. The file should be named ufload.txt. Be careful: notepad.exe will create a file called ufload.txt.txt by default. To avoid this, use "Save as..." and do not include .txt. Put the following into it:
