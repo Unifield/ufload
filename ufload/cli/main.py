@@ -251,6 +251,34 @@ def _cmdLs(args):
 
     return 0
 
+def _cmdUpgrade(args):
+    if not _required(args, [ 'patch', 'version' ]):
+        return 2
+
+    #Install the patch on the sync server
+    ss = 'SYNC_SERVER_LOCAL'
+    if args.ss:
+        ss = args.ss
+    ufload.db.installPatch(args, args.ss)
+
+    #List instances
+    inst = []
+    if args.i is not None:
+        inst = [x.lower() for x in args.i]
+    else:
+        inst = ufload.db._allDbs(args)
+
+    #Update instances
+    ufload._progress("Update instance %s" % inst[0])
+    ufload.db.updateInstance(inst[0])
+
+    #Log into every instance
+    for i in inst:
+        # do someting (like logging into UF, for instance...)
+        ufload._progress("Log into %s" % i)
+
+    return 0
+
 def parse():
     parser = argparse.ArgumentParser(prog='ufload')
 
@@ -288,11 +316,22 @@ def parse():
     pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
     pRestore.add_argument("-load-sync-server", dest='sync', action='store_true', help="set up a local sync server")
     pRestore.add_argument("-notify", dest='notify', help="run this script on each restored database")
+    pRestore.add_argument("-auto-sync", help="Activate automatic synchronization on restored instances")
+    pRestore.add_argument("-silent-upgrade", help="Activate silent upgrade on restored instances")
     pRestore.set_defaults(func=_cmdRestore)
     
     pArchive = sub.add_parser('archive', help="Copy new data into the database.")
     pArchive.add_argument("-from-dsn", action="append", help="the database to copy from (in the form of a DSN: 'hostaddr=x dbname=x user=x password=x')")
     pArchive.set_defaults(func=_cmdArchive)
+
+    pUpgrade = sub.add_parser('upgrade', help="Upgrade sync server and instances to a new version")
+    pUpgrade.add_argument("-patch", help="Path to the upgrade zip file")
+    pUpgrade.add_argument("-version", help="Targeted version number")
+    pUpgrade.add_argument("-ss", help="Instance name of the sync server (default = SYNC_SERVER_LOCAL)")
+    pUpgrade.add_argument("-i", action="append", help="Instances to upgrade programmatically (matched as a substring, default = all). Other instances will be upgraded at login")
+    pUpgrade.add_argument("-auto-sync", help="Activate automatic synchronization")
+    pUpgrade.add_argument("-silent-upgrade", help="Activate silent upgrade")
+    pUpgrade.set_defaults(func=_cmdUpgrade)
 
     # read from $HOME/.ufload first
     conffile = ConfigParser.SafeConfigParser()
@@ -307,7 +346,8 @@ def parse():
                        (parser, "sync"),
                        (pLs, "ls"),
                        (pRestore, "restore"),
-                       (pArchive, "archive")):
+                       (pArchive, "archive"),
+                       (pUpgrade, "upgrade")):
         if conffile.has_section(subn):
             subp.set_defaults(**dict(conffile.items(subn)))
 

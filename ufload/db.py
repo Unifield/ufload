@@ -232,6 +232,18 @@ def delive(args, db):
     if rc != 0:
         return rc
 
+    # Now we check for arguments allowing auto-sync and silent-upgrade
+    if args.auto-sync:
+        rc = psql(args, 'update ir_cron set active = \'t\', interval_type = \'hours\', interval_number = 2, nextcall = current_timestamp + interval \'1 hour\' where model  \'sync.client.entity\' and function = \'sync_threaded\';', db)
+        if rc != 0:
+            return rc
+    if args.silent-upgrade:
+        if not args.auto - sync:
+            ufload.progress("*** WARNING: Silent upgrade is enabled, but auto sync is not.")
+        rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = \'t\';', db)
+        if rc != 0:
+            return rc
+
     # Set the backup directory
     directory = "E'd:\\\\'"
     if sys.platform != "win32" and args.db_host in [ None, 'ct0', 'localhost' ]:
@@ -434,3 +446,41 @@ def _clean(out):
             continue
         ret.append(line)
     return "\n".join(ret)
+
+
+def _zipChecksum(path):
+    with open(path, 'rb') as f:
+        contents = f.read()
+        # md5 accepts only chunks of 128*N bytes
+        md5 = hashlib.md5()
+        for i in range(0, len(contents), 8192):
+            md5.update(contents[i:i + 8192])
+    return md5.hexdigest()
+
+
+def _zipContents(path):
+    with open(path, 'rb') as f:
+        contents = f.read()
+    return contents
+
+
+def installPatch(args, db='SYNC_SERVER_LOCAL'):
+    ufload.progress("Activating update_client module on %s database" % db)
+    #Install the module update_client
+    rc = psql(args, "UPDATE ir_module_module SET state = 'installed' WHERE name = 'update_client'", db)
+    if rc != 0:
+        return rc
+
+    v = args.version
+    ufload.progress("Installing v.%s patch on %s database" % (v, db))
+
+    checksum = _zipChecksum(args.patch)
+    contents = _zipContents(args.patch)
+    sql = "INSERT INTO sync_server_version (state, importance, name, comment, sum, patch) VALUES ('confirmed', 'required', '%s', 'Version %s installed by ufload', '%s', '%s')" % (v, v, checksum, contents)
+    rc = psql(args, sql, db)
+    if rc != 0:
+        return rc
+    return 0
+
+def updateInstance(inst):
+    return 0
