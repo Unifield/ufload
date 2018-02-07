@@ -316,8 +316,8 @@ def parse():
     pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
     pRestore.add_argument("-load-sync-server", dest='sync', action='store_true', help="set up a local sync server")
     pRestore.add_argument("-notify", dest='notify', help="run this script on each restored database")
-    pRestore.add_argument("-auto-sync", dest="auto-sync", action="store_true", help="Activate automatic synchronization on restored instances")
-    pRestore.add_argument("-silent-upgrade", dest="silent_upgrade", action="store_true", help="Activate silent upgrade on restored instances")
+    pRestore.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization on restored instances")
+    pRestore.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade on restored instances")
     pRestore.set_defaults(func=_cmdRestore)
     
     pArchive = sub.add_parser('archive', help="Copy new data into the database.")
@@ -329,8 +329,8 @@ def parse():
     pUpgrade.add_argument("-version", help="Targeted version number")
     pUpgrade.add_argument("-ss", help="Instance name of the sync server (default = SYNC_SERVER_LOCAL)")
     pUpgrade.add_argument("-i", action="append", help="Instances to upgrade programmatically (matched as a substring, default = all). Other instances will be upgraded at login")
-    pUpgrade.add_argument("-auto-sync", dest="auto-sync", action="store_true", help="Activate automatic synchronization")
-    pUpgrade.add_argument("-silent-upgrade", dest="silent-upgrade", action="store_true", help="Activate silent upgrade")
+    pUpgrade.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization")
+    pUpgrade.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade")
     pUpgrade.set_defaults(func=_cmdUpgrade)
 
     # read from $HOME/.ufload first

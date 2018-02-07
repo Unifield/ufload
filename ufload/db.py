@@ -233,12 +233,12 @@ def delive(args, db):
         return rc
 
     # Now we check for arguments allowing auto-sync and silent-upgrade
-    if args.auto-sync:
+    if args.autosync:
         rc = psql(args, 'update ir_cron set active = \'t\', interval_type = \'hours\', interval_number = 2, nextcall = current_timestamp + interval \'1 hour\' where model  \'sync.client.entity\' and function = \'sync_threaded\';', db)
         if rc != 0:
             return rc
-    if args.silent-upgrade:
-        if not args.auto - sync:
+    if args.silentupgrade:
+        if not args.autosync:
             ufload.progress("*** WARNING: Silent upgrade is enabled, but auto sync is not.")
         rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = \'t\';', db)
         if rc != 0:
