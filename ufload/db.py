@@ -234,7 +234,7 @@ def delive(args, db):
 
     # Now we check for arguments allowing auto-sync and silent-upgrade
     if args.autosync:
-        rc = psql(args, 'update ir_cron set active = \'t\', interval_type = \'hours\', interval_number = 2, nextcall = current_timestamp + interval \'1 hour\' where model  \'sync.client.entity\' and function = \'sync_threaded\';', db)
+        rc = psql(args, 'update ir_cron set active = \'t\', interval_type = \'hours\', interval_number = 2, nextcall = current_timestamp + interval \'1 hour\' where model = \'sync.client.entity\' and function = \'sync_threaded\';', db)
         if rc != 0:
             return rc
     if args.silentupgrade:
