@@ -464,7 +464,7 @@ def _zipContents(path):
     ufload.progress("Reading patch contents")
     with open(path, 'rb') as f:
         contents = f.read()
-    return contents
+    return [buffer(contents)]
 
 
 def installPatch(args, db='SYNC_SERVER_LOCAL'):
