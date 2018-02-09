@@ -450,6 +450,7 @@ def _clean(out):
 
 
 def _zipChecksum(path):
+    ufload.progress("Validating patch checksum")
     with open(path, 'rb') as f:
         contents = f.read()
         # md5 accepts only chunks of 128*N bytes
@@ -460,6 +461,7 @@ def _zipChecksum(path):
 
 
 def _zipContents(path):
+    ufload.progress("Reading patch contents")
     with open(path, 'rb') as f:
         contents = f.read()
     return contents
@@ -475,9 +477,14 @@ def installPatch(args, db='SYNC_SERVER_LOCAL'):
     v = args.version
     ufload.progress("Installing v.%s patch on %s database" % (v, db))
 
-    checksum = _zipChecksum(args.patch)
-    contents = _zipContents(args.patch)
+    patch = os.path.normpath(args.patch)
+
+    checksum = _zipChecksum(patch)
+    contents = _zipContents(patch)
     sql = "INSERT INTO sync_server_version (state, importance, name, comment, sum, patch) VALUES ('confirmed', 'required', '%s', 'Version %s installed by ufload', '%s', '%s')" % (v, v, checksum, contents)
+    ufload.progress("*************************************************************************************")
+    ufload.progress( sql )
+    ufload.progress("*************************************************************************************")
     rc = psql(args, sql, db)
     if rc != 0:
         return rc
