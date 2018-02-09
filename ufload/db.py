@@ -1,4 +1,4 @@
-import os, sys, subprocess, tempfile, hashlib
+import os, sys, subprocess, tempfile, hashlib, urllib
 import ufload
 
 def _run_out(args, cmd):
@@ -237,6 +237,7 @@ def delive(args, db):
         rc = psql(args, 'update ir_cron set active = \'t\', interval_type = \'hours\', interval_number = 2, nextcall = current_timestamp + interval \'1 hour\' where model = \'sync.client.entity\' and function = \'sync_threaded\';', db)
         if rc != 0:
             return rc
+        rc = psql(args, 'update sync_client_sync_server_connection SET host = \'127.0.0.1\', database = \'%s\';' % args.ss, db)
     if args.silentupgrade:
         if not args.autosync:
             ufload.progress("*** WARNING: Silent upgrade is enabled, but auto sync is not.")
@@ -483,4 +484,7 @@ def installPatch(args, db='SYNC_SERVER_LOCAL'):
     return 0
 
 def updateInstance(inst):
+    #Call the do_login url in order to trigger the sync (should work even with wrong credentials)
+    ufload.progress("Try to log into instance %s using wrong credentials" % inst)
+    urllib.request("http://127.0.0.1:8061/openerp/do_login?target=/&user=ufload&show_password=ufload&db_user_pass=%s" % inst)
     return 0

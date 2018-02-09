@@ -59,8 +59,13 @@ def _cmdArchive(args):
     return ufload.db.archive(args)
 
 def _cmdRestore(args):
-    if args.sync:
+    if args.autosync:
         if not _required(args, [ 'syncuser', 'syncpw' ]):
+            ufload.progress("Sync-server (-ss) argument is mandatory for auto-sync")
+            return 2
+
+    if args.autosync is not None:
+        if not _required(args, [ 'ss' ]):
             return 2
 
     if args.file is not None:
@@ -259,23 +264,19 @@ def _cmdUpgrade(args):
     ss = 'SYNC_SERVER_LOCAL'
     if args.ss:
         ss = args.ss
-    ufload.db.installPatch(args, args.ss)
+    ufload.db.installPatch(args, ss)
 
     #List instances
     inst = []
     if args.i is not None:
-        inst = [x.lower() for x in args.i]
+        instances = [x.lower() for x in args.i]
     else:
-        inst = ufload.db._allDbs(args)
+        instances = ufload.db._allDbs(args)
 
     #Update instances
-    ufload._progress("Update instance %s" % inst[0])
-    ufload.db.updateInstance(inst[0])
-
-    #Log into every instance
-    for i in inst:
-        # do someting (like logging into UF, for instance...)
-        ufload._progress("Log into %s" % i)
+    for instance in instances:
+        ufload._progress("Update instance %s" % instance)
+        ufload.db.updateInstance(instance)
 
     return 0
 
@@ -318,6 +319,7 @@ def parse():
     pRestore.add_argument("-notify", dest='notify', help="run this script on each restored database")
     pRestore.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization on restored instances")
     pRestore.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade on restored instances")
+    pRestore.add_argument("-ss", help="Instance name of the sync server (default = SYNC_SERVER_LOCAL)")
     pRestore.set_defaults(func=_cmdRestore)
     
     pArchive = sub.add_parser('archive', help="Copy new data into the database.")
