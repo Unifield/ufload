@@ -217,7 +217,7 @@ def delive(args, db):
             port = 12153
     else:
         pfx = ''
-    rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = \'f\', protocol = \'xmlrpc\', login = \'%s\', database = \'%sSYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, port), db)
+    rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = \'f\', protocol = \'xmlrpc\', login = \'%s\', database = \'SYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, port), db)
     if rc != 0:
         return rc
 
@@ -389,6 +389,9 @@ def write_sync_server_len(args, l, db='SYNC_SERVER_LOCAL'):
 def sync_server_all_admin(args, db='SYNC_SERVER_LOCAL'):
     _run_out(args, mkpsql(args, 'update sync_server_entity set user_id = 1;', db))
 
+def sync_server_settings(args, sync_server, db):
+    _run_out(args, mkpsql(args, 'update sync_client_sync_server_connection set database = \'SYNC_SERVER_LOCAL\', login=\'admin\' user_id = 1;', db))
+
 def _parse_dsn(dsn):
     res = {}
     for i in dsn.split():
@@ -481,10 +484,10 @@ def installPatch(args, db='SYNC_SERVER_LOCAL'):
 
     checksum = _zipChecksum(patch)
     contents = _zipContents(patch)
-    sql = "INSERT INTO sync_server_version (state, importance, name, comment, sum, patch) VALUES ('confirmed', 'required', '%s', 'Version %s installed by ufload', '%s', '%s')" % (v, v, checksum, contents)
-    ufload.progress("*************************************************************************************")
+    sql = "INSERT INTO sync_server_version (create_uid, create_date, write_date, write_uid, date, state, importance, name, comment, sum, patch) VALUES (1, NOW(), NOW(), 1, NOW(),  'confirmed', 'required', '%s', 'Version %s installed by ufload', '%s', '%s')" % (v, v, checksum, contents)
+    ufload.progress("************************************ DEBUG *************************************************")
     ufload.progress( sql )
-    ufload.progress("*************************************************************************************")
+    ufload.progress("********************************************************************************************")
     rc = psql(args, sql, db)
     if rc != 0:
         return rc

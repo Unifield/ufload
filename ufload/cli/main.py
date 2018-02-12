@@ -59,13 +59,13 @@ def _cmdArchive(args):
     return ufload.db.archive(args)
 
 def _cmdRestore(args):
-    if args.autosync:
-        if not _required(args, [ 'syncuser', 'syncpw' ]):
-            ufload.progress("Sync-server (-ss) argument is mandatory for auto-sync")
-            return 2
+    # if args.sync:
+    #     if not _required(args, [ 'syncuser', 'syncpw' ]):
+    #         return 2
 
     if args.autosync is not None:
-        if not _required(args, [ 'ss' ]):
+        if not _required(args, [ 'sync' ]):
+            ufload.progress("Load sync-server (-load-sync-server) argument is mandatory for auto-sync")
             return 2
 
     if args.file is not None:
@@ -77,7 +77,12 @@ def _cmdRestore(args):
         return rc
 
     if args.sync:
+        # Restore a sync server (LIGHT WITH MASTER)
         rc = _syncRestore(args, dbs)
+        # Update instances sync settings
+        for db in dbs:
+            ufload._progress("Connection settings for %s" % db)
+            ufload.db.sync_server_settings(args, 'SYNC_SERVER_LOCAL', db)
 
     return rc
 
@@ -227,7 +232,7 @@ def _syncLink(args, dbs, sdb):
         return 0
 
     for db in dbs:
-        rc = ufload.db.sync_link(args, hwid, db, sdb)
+        rc = ufload.db.sync_link(args, hwid, db, sdb)   #Update hardware_id and entity name (of the instance) in sync server db
         if rc != 0:
             return rc
     return 0
@@ -319,7 +324,7 @@ def parse():
     pRestore.add_argument("-notify", dest='notify', help="run this script on each restored database")
     pRestore.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization on restored instances")
     pRestore.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade on restored instances")
-    pRestore.add_argument("-ss", help="Instance name of the sync server (default = SYNC_SERVER_LOCAL)")
+    #pRestore.add_argument("-ss", help="Instance name of the sync server (default = SYNC_SERVER_LOCAL)")
     pRestore.set_defaults(func=_cmdRestore)
     
     pArchive = sub.add_parser('archive', help="Copy new data into the database.")
