@@ -32,6 +32,9 @@ install_requires = [
     'ndg-httpsclient',
     'pyasn1',
     'easywebdav',
+    'oerplib',
+    'pybase64',
+    'Office365-REST-Python-Client'
 ]
 
 tests_require = [

@@ -1,4 +1,4 @@
-import os, sys, subprocess, tempfile, hashlib, urllib
+import os, sys, subprocess, tempfile, hashlib, urllib, oerplib, zipfile
 import ufload
 
 def _run_out(args, cmd):
@@ -77,7 +77,7 @@ def mkpsql(args, sql, db='postgres'):
 def psql(args, sql, db='postgres', silent=False):
     return _run(args, mkpsql(args, sql, db), silent)
     
-def load_into(args, db, f, sz):
+def load_zip_into(args, db, f, sz):
     tot = float(sz)
     if sz == 0:
         ufload.progress("Note: No progress percent available.")
@@ -105,21 +105,15 @@ def load_into(args, db, f, sz):
         # Windows pg_restore gets confused when reading from a pipe,
         # so write to a temp file first.
         if sys.platform == "win32":
-            tf = tempfile.NamedTemporaryFile(delete=False)
+            #tf = tempfile.NamedTemporaryFile(delete=False)
             if not args.show:
-                n = 0
-                next = 10
-                for chunk in iter(lambda: f.read(1024 * 1024), b''):
-                    tf.write(chunk)
-                    n += len(chunk)
-                    if tot != 0:
-                        pct = n/tot * 100
-                        if pct > next:
-                            ufload.progress("Loading data: %d%%" % int(pct))
-                            next = int(pct / 10)*10 + 10
 
-            tf.close()
-            cmd.append(tf.name)
+                z = zipfile.ZipFile(f)
+                names = z.namelist()
+                fn = names[0]
+                z.extract(fn)
+
+                cmd.append(fn)
 
             ufload.progress("Starting restore. This will take some time.")
             try:
@@ -129,7 +123,7 @@ def load_into(args, db, f, sz):
 
             # clean up the temp file
             try:
-                os.unlink(tf.name)
+                os.unlink(fn)
             except OSError:
                 pass
         else:
@@ -182,11 +176,125 @@ def load_into(args, db, f, sz):
         _checkrc(rc)
         
         return 0
-    except dbException as e:
+    except Exception as e:
         # something went wrong, so drop the temp table
         ufload.progress("Cleanup: dropping table %s" % db2)
         killCons(args, db2)
         psql(args, 'DROP DATABASE \"%s\"'%db2)
+        return e.rc
+
+
+def load_dump_into(args, db, f, sz):
+    tot = float(sz)
+    if sz == 0:
+        ufload.progress("Note: No progress percent available.")
+
+    db2 = db + "_" + str(os.getpid())
+
+    ufload.progress("Create database " + db2)
+    rc = psql(args, 'CREATE DATABASE \"%s\"' % db2)
+    if rc != 0:
+        return rc
+
+    # From here out, we need a try block, so that we can drop
+    # the temp db if anything went wrong
+    try:
+        ufload.progress("Restoring into %s" % db2)
+
+        cmd = pg_restore(args)
+        cmd.append('--no-acl')
+        cmd.append('--no-owner')
+        cmd.append('-d')
+        cmd.append(db2)
+        cmd.append('-n')
+        cmd.append('public')
+
+        # Windows pg_restore gets confused when reading from a pipe,
+        # so write to a temp file first.
+        if sys.platform == "win32":
+            tf = tempfile.NamedTemporaryFile(delete=False)
+            if not args.show:
+
+                n = 0
+                next = 10
+                for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                    tf.write(chunk)
+                    n += len(chunk)
+                    if tot != 0:
+                        pct = n / tot * 100
+                        if pct > next:
+                            ufload.progress("Loading data: %d%%" % int(pct))
+                            next = int(pct / 10) * 10 + 10
+
+            tf.close()
+            cmd.append(tf.name)
+
+            ufload.progress("Starting restore. This will take some time.")
+            try:
+                rc = _run(args, cmd)
+            except KeyboardInterrupt:
+                raise dbException(1)
+
+            # clean up the temp file
+            try:
+                os.unlink(fn)
+            except OSError:
+                pass
+        else:
+            # For non-Windows, feed the data in via pipe so that we have
+            # some progress indication.
+            if not args.show:
+                p = subprocess.Popen(cmd, bufsize=1024 * 1024 * 10,
+                                     stdin=subprocess.PIPE,
+                                     stdout=sys.stdout,
+                                     stderr=sys.stderr,
+                                     env=pg_pass(args))
+
+                n = 0
+                next = 10
+                for chunk in iter(lambda: f.read(8192), b''):
+                    try:
+                        p.stdin.write(chunk)
+                    except IOError:
+                        break
+                    n += len(chunk)
+                    if tot != 0:
+                        pct = n / tot * 100
+                        if pct > next:
+                            ufload.progress("Restoring: %d%%" % int(pct))
+                            next = int(pct / 10) * 10 + 10
+
+                p.stdin.close()
+                ufload.progress("Restoring: 100%")
+                ufload.progress("Waiting for Postgres to finish restore")
+                rc = p.wait()
+            else:
+                ufload.progress("Would run: " + str(cmd))
+                rc = 0
+
+        rcstr = "ok"
+        if rc != 0:
+            rcstr = "error %d" % rc
+        ufload.progress("Restore finished with result code: %s" % rcstr)
+        _checkrc(rc)
+
+        _checkrc(delive(args, db2))
+
+        ufload.progress("Drop database " + db)
+        killCons(args, db)
+        rc = psql(args, 'DROP DATABASE IF EXISTS \"%s\"' % db)
+        _checkrc(rc)
+
+        ufload.progress("Rename database %s to %s" % (db2, db))
+        rc = psql(args, 'ALTER DATABASE \"%s\" RENAME TO \"%s\"' % (db2, db))
+        _checkrc(rc)
+
+        return 0
+    except dbException as e:
+        # something went wrong, so drop the temp table
+        ufload.progress("Cleanup: dropping table %s" % db2)
+        killCons(args, db2)
+        psql(args, 'DROP DATABASE \"%s\"' % db2)
         return e.rc
 
 # De-live uses psql to change a restored database taken from a live backup
@@ -198,6 +306,8 @@ def load_into(args, db, f, sz):
 def delive(args, db):
     if args.live:
         ufload.progress("*** WARNING: The restored database has LIVE passwords and LIVE syncing.")
+        if args.sync:
+            ufload.progress("(please note that ufload is not able to connect to the sync server using live passwords, please connect manually)")
         return 0
     
     adminuser = args.adminuser.lower()
@@ -217,7 +327,7 @@ def delive(args, db):
             port = 12153
     else:
         pfx = ''
-    rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = \'f\', protocol = \'xmlrpc\', login = \'%s\', database = \'SYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, port), db)
+    rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = \'f\', protocol = \'xmlrpc\', login = \'%s\', database = \'%sSYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, port), db)
     if rc != 0:
         return rc
 
@@ -234,10 +344,14 @@ def delive(args, db):
 
     # Now we check for arguments allowing auto-sync and silent-upgrade
     if args.autosync:
+        ss = 'SYNC_SERVER_LOCAL'
+        if args.ss:
+            ss = args.ss
+        activate_autosync(args, db, ss)
         rc = psql(args, 'update ir_cron set active = \'t\', interval_type = \'hours\', interval_number = 2, nextcall = current_timestamp + interval \'1 hour\' where model = \'sync.client.entity\' and function = \'sync_threaded\';', db)
         if rc != 0:
             return rc
-        rc = psql(args, 'update sync_client_sync_server_connection SET host = \'127.0.0.1\', database = \'%s\';' % args.ss, db)
+        rc = psql(args, 'update sync_client_sync_server_connection SET host = \'127.0.0.1\', database = \'%s\';' % ss, db)
     if args.silentupgrade:
         if not args.autosync:
             ufload.progress("*** WARNING: Silent upgrade is enabled, but auto sync is not.")
@@ -271,6 +385,28 @@ def delive(args, db):
 
     # ok, delive finished with no problems
     return 0
+
+def activate_autosync(args, db, ss):
+    rc = psql(args,
+              'update ir_cron set active = \'t\', interval_type = \'hours\', interval_number = 2, nextcall = current_timestamp + interval \'1 hour\' where model = \'sync.client.entity\' and function = \'sync_threaded\';',
+              db)
+    if rc != 0:
+        return rc
+
+    rc = psql(args,
+              'update sync_client_sync_server_connection SET host = \'127.0.0.1\', database = \'%s\';' % ss,
+              db)
+
+    return rc
+
+def activate_silentupgrade(args, db):
+    rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = \'t\';', db)
+
+    if not args.autosync:
+        ufload.progress("*** WARNING: Silent upgrade is enabled, but auto sync is not.")
+
+    return rc
+
 
 def _checkrc(rc):
     if rc != 0:
@@ -336,7 +472,14 @@ def _db_to_instance(args, db):
     return '_'.join(db.split('_')[0:-2])
 
 def sync_link(args, hwid, db, sdb):
-    return psql(args, 'update sync_server_entity set hardware_id = \'%s\' where name = \'%s\';' % (hwid, _db_to_instance(args, db)), sdb)
+    instance = _db_to_instance(args, db)
+    #Create the instance in the sync server if it does not already exist
+    rc = psql(args, 'insert into sync_server_entity (create_uid, create_date, write_date, write_uid, user_id, name, state) SELECT 1, now(), now(), 1, 1, \'%s\', \'validated\' FROM sync_server_entity WHERE NOT EXISTS (SELECT 1 FROM sync_server_entity WHERE name = \'%s\') ' % (instance, instance), sdb )
+    if rc != 0:
+        return rc
+
+    #Update hardware id for this instance
+    return psql(args, 'update sync_server_entity set hardware_id = \'%s\' where name = \'%s\';' % (hwid, instance), sdb)
 
 # Remove all databases which come from the same instance as db
 def clean(args, db):
@@ -390,7 +533,19 @@ def sync_server_all_admin(args, db='SYNC_SERVER_LOCAL'):
     _run_out(args, mkpsql(args, 'update sync_server_entity set user_id = 1;', db))
 
 def sync_server_settings(args, sync_server, db):
-    _run_out(args, mkpsql(args, 'update sync_client_sync_server_connection set database = \'SYNC_SERVER_LOCAL\', login=\'admin\' user_id = 1;', db))
+    _run_out(args, mkpsql(args, 'update sync_client_sync_server_connection set database = \'%s\', login=\'%s\' user_id = 1;' % (sync_server, args.adminuser.lower()) , db))
+
+def connect_instance_to_sync_server(args, sync_server, db):
+    #oerp = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=12173, version='6.0')
+    ufload.progress('Connecting instance %s to %s' % (db, sync_server))
+    #netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=12173, timeout=1000, version='6.0')
+    netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=8069, timeout=1000, version='6.0')
+    netrpc.login(args.adminuser.lower(), args.adminpw, database=db)
+    conn_manager = netrpc.get('sync.client.sync_server_connection')
+    conn_ids = conn_manager.search([])
+    conn_manager.write(conn_ids, {'password': args.adminpw})
+    conn_manager.connect()
+    #netrpc.get('sync.client.entity').sync()
 
 def _parse_dsn(dsn):
     res = {}
@@ -485,9 +640,6 @@ def installPatch(args, db='SYNC_SERVER_LOCAL'):
     checksum = _zipChecksum(patch)
     contents = _zipContents(patch)
     sql = "INSERT INTO sync_server_version (create_uid, create_date, write_date, write_uid, date, state, importance, name, comment, sum, patch) VALUES (1, NOW(), NOW(), 1, NOW(),  'confirmed', 'required', '%s', 'Version %s installed by ufload', '%s', '%s')" % (v, v, checksum, contents)
-    ufload.progress("************************************ DEBUG *************************************************")
-    ufload.progress( sql )
-    ufload.progress("********************************************************************************************")
     rc = psql(args, sql, db)
     if rc != 0:
         return rc

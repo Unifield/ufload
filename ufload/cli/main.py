@@ -1,4 +1,4 @@
-import ConfigParser, argparse, os, sys
+import ConfigParser, argparse, os, sys, oerplib
 import requests
 import requests.auth
 import subprocess
@@ -32,6 +32,7 @@ def _ocToDir(oc):
         # no OC abbrev, assume this is a real directory name
         return oc
 
+
 def _required(args, req):
     err = 0
     for r in req:
@@ -46,12 +47,16 @@ def _required(args, req):
 def _file_to_db(args, fn):
     fn = os.path.basename(fn)
     x = fn.split('-')
-    if len(x) < 2 or len(x[2]) != 6:
-        return None
-    db = "_".join([ x[0], x[1], x[2][0:4]])
+    #if len(x) < 2 or len(x[2]) != 6:
+    #    return None
+    if len(x) > 1 and len(x[2]) == 6:
+        db = "_".join([ x[0], x[1], x[2][0:4]])
+    else:
+        db = fn[:-5]
     if args.db_prefix:
         return args.db_prefix + "_" + db
     return db
+
 
 def _cmdArchive(args):
     if not _required(args, [ 'from_dsn' ]):
@@ -65,11 +70,13 @@ def _cmdRestore(args):
 
     if args.autosync is not None:
         if not _required(args, [ 'sync' ]):
-            ufload.progress("Load sync-server (-load-sync-server) argument is mandatory for auto-sync")
+            ufload.progress("Load sync server (-load-sync-server) argument is mandatory for auto-sync")
             return 2
 
     if args.file is not None:
         rc, dbs = _fileRestore(args)
+    elif args.dir is not None:
+        rc, dbs = _dirRestore(args)
     else:
         rc, dbs = _multiRestore(args)
 
@@ -79,10 +86,15 @@ def _cmdRestore(args):
     if args.sync:
         # Restore a sync server (LIGHT WITH MASTER)
         rc = _syncRestore(args, dbs)
+
+    if args.sync or args.autosync:
         # Update instances sync settings
         for db in dbs:
             ufload._progress("Connection settings for %s" % db)
+            #Defines sync server connection settings on each instance
             ufload.db.sync_server_settings(args, 'SYNC_SERVER_LOCAL', db)
+            #Connects each instance to the sync server (and sets pwd)
+            ufload.db.connect_instance_to_sync_server(args, 'SYNC_SERVER_LOCAL', db)
 
     return rc
 
@@ -106,7 +118,7 @@ def _fileRestore(args):
         return 1, None
 
     with open(args.file, 'rb') as f:
-        rc = ufload.db.load_into(args, db, f, statinfo.st_size)
+        rc = ufload.db.load_dump_into(args, db, f, statinfo.st_size)
 
     if not args.noclean:
         rc = ufload.db.clean(args, db)
@@ -119,9 +131,45 @@ def _fileRestore(args):
     else:
         return rc, None
 
+def _dirRestore(args):
+    files = os.listdir(args.dir)
+    dbs = []
+    atleastone = False
+
+    for file in files:
+        db = _file_to_db(args, file)
+        fullfile = '%s/%s' % (args.dir, file)
+        if db is None:
+            ufload.progress("Could not set the instance from the file %s." % file)
+        else:
+            dbs.append(db)
+            atleastone = True
+
+        try:
+            statinfo = os.stat(fullfile)
+            sz = statinfo.st_size
+        except OSError as e:
+            ufload.progress("Could not find file size: " + str(e))
+            sz = 0
+            return 1, None
+
+        with open(fullfile, 'rb') as f:
+            rc = ufload.db.load_dump_into(args, db, f, sz)
+
+        if not args.noclean:
+            rc = ufload.db.clean(args, db)
+
+        if args.notify:
+            subprocess.call([args.notify, db])
+
+    if atleastone:
+        return 0, dbs
+    else:
+        return 2, None
+
 def _multiRestore(args):
     if not _required(args, [ 'user', 'pw', 'oc' ]):
-        ufload.progress('With no -file argument, ownCloud login info is needed.')
+        ufload.progress('With no -file or -dir argument, cloud credentials are mandatory.')
         return 2, None
 
     if args.i is None:
@@ -129,44 +177,62 @@ def _multiRestore(args):
     else:
         ufload.progress("Multiple Instance restore for instances matching: %s" % " or ".join(args.i))
 
-    instances = ufload.cloud.list_files(user=args.user,
-                                    pw=args.pw,
-                                    where=_ocToDir(args.oc),
-                                    instances=args.i)
+    #Cloud access
+    info = ufload.cloud.get_cloud_info(args)
+    ufload.progress('site=%s - path=%s - dir=%s' % (info.get('site'), info.get('path'), info.get('dir')))
+    dav = ufload.cloud.get_onedrive_connection(args)
+    instances = ufload.cloud.list_files(user=info.get('login'),
+                                        pw=info.get('password'),
+                                        where=info.get('dir'),
+                                        instances=args.i,
+                                        dav=dav,
+                                        url=info.get('url'),
+                                        site=info.get('site'),
+                                        path=info.get('path'))
     ufload.progress("Instances to be restored: %s" % ", ".join(instances.keys()))
     dbs=[]
     for i in instances:
         files_for_instance = instances[i]
         for j in files_for_instance:
             ufload.progress("Trying file %s" % j[1])
-            n = ufload.cloud.peek_inside_file(j[0], j[1],
+            filename = dav.download(j[0],j[1])
+            n= ufload.cloud.peek_inside_local_file(j[0], filename)
+            '''n = ufload.cloud.peek_inside_file(j[0], j[1],
                                            user=args.user,
                                            pw=args.pw,
+                                           dav=dav,
                                            where=_ocToDir(args.oc))
+            '''
             if n is None:
+                os.unlink(j[1])
                 # no dump inside of zip, try the next one
                 continue
 
             db = _file_to_db(args, str(n))
             if ufload.db.exists(args, db):
                 ufload.progress("Database %s already exists." % db)
+                os.unlink(j[1])
                 break
             else:
                 ufload.progress("Database %s does not exist, restoring." % db)
 
-            f, sz = ufload.cloud.openDumpInZip(j[0], j[1],
+            '''f, sz = ufload.cloud.openDumpInZip(j[0], j[1],
                                            user=args.user,
                                            pw=args.pw,
                                            where=_ocToDir(args.oc))
+            '''
+            f, sz = ufload.cloud.openDumpInZip(j[1])
             if f is None:
+                os.unlink(j[1])
                 continue
 
             db = _file_to_db(args, f.name)
             if db is None:
                 ufload.progress("Bad filename %s. Skipping." % f.name)
+                os.unlink(j[1])
                 continue
 
-            rc = ufload.db.load_into(args, db, f, sz)
+            rc = ufload.db.load_zip_into(args, db, j[1], sz)
             if rc == 0:
                 dbs.append(db)
 
@@ -178,6 +244,7 @@ def _multiRestore(args):
 
                 # We got a good load, so go to the next instance.
                 break
+            os.unlink(j[1])
 
     return 0, dbs
 
@@ -192,7 +259,7 @@ def _syncRestore(args, dbs):
         r = requests.head(url,
                           auth=requests.auth.HTTPBasicAuth(args.syncuser, args.syncpw))
         if r.status_code != 200:
-	    ufload.progress("HTTP HEAD error: %s" % r.status_code)
+            ufload.progress("HTTP HEAD error: %s" % r.status_code)
             return 1
     except KeyboardInterrupt as e:
         raise e
@@ -213,7 +280,7 @@ def _syncRestore(args, dbs):
     if r.status_code != 200:
 	ufload.progress("HTTP GET error: %s" % r.status_code)
         return 1
-    rc = ufload.db.load_into(args, sdb, r.raw, sz)
+    rc = ufload.db.load_dump_into(args, sdb, r.raw, sz)
     if rc != 0:
         return rc
     ufload.db.write_sync_server_len(args, sz, sdb)
@@ -232,6 +299,7 @@ def _syncLink(args, dbs, sdb):
         return 0
 
     for db in dbs:
+        ufload.progress("Updating hardware id and entity name for %s in sync server" % db)
         rc = ufload.db.sync_link(args, hwid, db, sdb)   #Update hardware_id and entity name (of the instance) in sync server db
         if rc != 0:
             return rc
@@ -241,28 +309,32 @@ def _cmdLs(args):
     if not _required(args, [ 'user', 'pw', 'oc' ]):
         return 2
 
-    instances = ufload.cloud.list_files(user=args.user,
-                                    pw=args.pw,
-                                    where=_ocToDir(args.oc),
-                                    instances=args.i)
+    # Cloud access
+    info = ufload.cloud.get_cloud_info(args)
+    dav = ufload.cloud.get_onedrive_connection(args)
+    instances = ufload.cloud.list_files(user=info.get('login'),
+                                        pw=info.get('password'),
+                                        where=info.get('dir'),
+                                        instances=args.i,
+                                        dav=dav,
+                                        url=info.get('url'),
+                                        site=info.get('site'),
+                                        path=info.get('path'))
+
     if len(instances) == 0:
         ufload.progress("No files found.")
         return 1
 
     for i in instances:
         for j in instances[i]:
-            n = ufload.cloud.peek_inside_file(j[0], j[1],
-                                              user=args.user,
-                                              pw=args.pw,
-                                              where=_ocToDir(args.oc))
-            print ": ".join((j[1], str(n)))
+            print j[1]
             # only show the latest for each one
             break
 
     return 0
 
 def _cmdUpgrade(args):
-    if not _required(args, [ 'patch', 'version' ]):
+    if not _required(args, [ 'patch', 'version', 'adminuser', 'adminpw' ]):
         return 2
 
     #Install the patch on the sync server
@@ -274,23 +346,33 @@ def _cmdUpgrade(args):
     #List instances
     inst = []
     if args.i is not None:
-        instances = [x.lower() for x in args.i]
+        instances = [x for x in args.i]
     else:
         instances = ufload.db._allDbs(args)
 
+    _syncLink(args, instances, ss)
+
     #Update instances
     for instance in instances:
-        ufload._progress("Update instance %s" % instance)
-        ufload.db.updateInstance(instance)
+        ufload._progress("Connecting instance %s to sync server %s" % (instance, ss))
+        ufload.db.connect_instance_to_sync_server(args, ss, instance)
+        #ufload._progress("Update instance %s" % instance)
+        #ufload.db.updateInstance(instance)
+        if args.autosync:
+            #activate auto-sync (now + 1 hour)
+            ufload.db.activate_autosync(args, instance, ss)
+        if args.silentupgrade:
+            #activate silent upgrade
+            ufload.db.activate_silentupgrade(args, instance)
 
     return 0
 
 def parse():
     parser = argparse.ArgumentParser(prog='ufload')
 
-    parser.add_argument("-user", help="ownCloud username")
-    parser.add_argument("-pw", help="ownCloud password")
-    parser.add_argument("-oc", help="ownCloud directory (OCG, OCA, OCB accepted as shortcuts)")
+    parser.add_argument("-user", help="Cloud username")
+    parser.add_argument("-pw", help="Cloud password")
+    parser.add_argument("-oc", help="Cloud directory (OCG, OCA, OCB accepted as shortcuts)")
 
     parser.add_argument("-syncuser", help="username to access the sync server backup")
     parser.add_argument("-syncpw", help="password to access the sync server backup")
@@ -312,15 +394,16 @@ def parse():
     pLs.add_argument("-i", action="append", help="instances to work on (matched as a substring, default = all)")
     pLs.set_defaults(func=_cmdLs)
 
-    pRestore = sub.add_parser('restore', help="Restore a database from ownCloud or a file")
+    pRestore = sub.add_parser('restore', help="Restore a database from cloud, a directory or a file")
     pRestore.add_argument("-i", action="append", help="instances to work on (matched as a substring)")
-    pRestore.add_argument("-file", help="the file to restore (disabled ownCloud downloading)")
+    pRestore.add_argument("-file", help="the file to restore (disabled cloud downloading)")
+    pRestore.add_argument("-dir", help="the directory holding the files to restore (disabled cloud downloading)")
     pRestore.add_argument("-adminuser", default='admin', help="the new admin username in the newly restored database")
     pRestore.add_argument("-adminpw", default='admin', help="the password to set into the newly restored database")
     pRestore.add_argument("-nopwreset", dest='nopwreset', action='store_true', help="do not change any passwords")
     pRestore.add_argument("-live", dest='live', action='store_true', help="do not take the normal actions to make a restore into a non-production instance")
     pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
-    pRestore.add_argument("-load-sync-server", dest='sync', action='store_true', help="set up a local sync server")
+    pRestore.add_argument("-load-sync-server", dest='sync', action='store_true', help="set up a local sync server and connects the restored instance(s) to it")
     pRestore.add_argument("-notify", dest='notify', help="run this script on each restored database")
     pRestore.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization on restored instances")
     pRestore.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade on restored instances")
@@ -335,9 +418,12 @@ def parse():
     pUpgrade.add_argument("-patch", help="Path to the upgrade zip file")
     pUpgrade.add_argument("-version", help="Targeted version number")
     pUpgrade.add_argument("-ss", help="Instance name of the sync server (default = SYNC_SERVER_LOCAL)")
+    pUpgrade.add_argument("-adminuser", default='admin', help="the admin username to log into the instances")
+    pUpgrade.add_argument("-adminpw", default='admin', help="the admin password to log into the instances")
     pUpgrade.add_argument("-i", action="append", help="Instances to upgrade programmatically (matched as a substring, default = all). Other instances will be upgraded at login")
     pUpgrade.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization")
     pUpgrade.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade")
+
     pUpgrade.set_defaults(func=_cmdUpgrade)
 
     # read from $HOME/.ufload first
@@ -347,7 +433,7 @@ def parse():
     else:
         conffile.read('%s/.ufload' % _home())
 
-    for subp, subn in ((parser, "owncloud"),
+    for subp, subn in ((parser, "onedrive"),    #(parser, "owncloud"),
                        (parser, "postgres"),
                        (parser, "logs"),
                        (parser, "sync"),
@@ -377,3 +463,5 @@ def main():
         requests.post(args.remote+"?who=%s"%hostname, data='\n'.join(_logs))
 
     sys.exit(rc)
+
+main()
