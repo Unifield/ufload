@@ -60,9 +60,11 @@ To see a list of all backup files for an instance: ```ufload ls -i OCG_HQ```
 
 For all instances, remove the ```-i``` flag.
 
-To load all of the instances from ownCloud: ```ufload restore```
+To load all of the instances from OneDrive: ```ufload restore```
 
-To load the OCG_HQ instance and all the OCG_NE1 instances from ownCloud: ```ufload restore -i OCG_HQ -i OCG_NE1```
+To load the OCG_HQ instance and all the OCG_NE1 instances from OneDrive: ```ufload restore -i OCG_HQ -i OCG_NE1```
+
+To load the OCG_HQ and OCG_NE1 instances from OneDrive and load a sync server: ```ufload restore -i OCG_HQ -i OCG_NE1 -load-sync-server```
 
 ## Scheduling ufload in Windows
 

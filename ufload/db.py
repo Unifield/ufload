@@ -4,7 +4,7 @@ import ufload
 def _run_out(args, cmd):
     try:
         return subprocess.check_output(cmd, env=pg_pass(args), stderr=subprocess.STDOUT).split('\n')
-    except:
+    except Exception as e:
         return []
 
 def _run(args, cmd, get_out=False, silent=False):
@@ -101,19 +101,15 @@ def load_zip_into(args, db, f, sz):
         cmd.append(db2)
         cmd.append('-n')
         cmd.append('public')
-    
-        # Windows pg_restore gets confused when reading from a pipe,
-        # so write to a temp file first.
-        if sys.platform == "win32":
-            #tf = tempfile.NamedTemporaryFile(delete=False)
-            if not args.show:
 
-                z = zipfile.ZipFile(f)
-                names = z.namelist()
-                fn = names[0]
-                z.extract(fn)
+        if not args.show:
 
-                cmd.append(fn)
+            z = zipfile.ZipFile(f)
+            names = z.namelist()
+            fn = names[0]
+            z.extract(fn)
+
+            cmd.append(fn)
 
             ufload.progress("Starting restore. This will take some time.")
             try:
@@ -126,37 +122,10 @@ def load_zip_into(args, db, f, sz):
                 os.unlink(fn)
             except OSError:
                 pass
+
         else:
-            # For non-Windows, feed the data in via pipe so that we have
-            # some progress indication.
-            if not args.show:
-                p = subprocess.Popen(cmd, bufsize=1024*1024*10,
-                                     stdin=subprocess.PIPE,
-                                     stdout=sys.stdout,
-                                     stderr=sys.stderr,
-                                     env=pg_pass(args))
-
-                n = 0
-                next = 10
-                for chunk in iter(lambda: f.read(8192), b''):
-                    try:
-                        p.stdin.write(chunk)
-                    except IOError:
-                        break
-                    n += len(chunk)
-                    if tot != 0:
-                        pct = n/tot * 100
-                        if pct > next:
-                            ufload.progress("Restoring: %d%%" % int(pct))
-                            next = int(pct / 10)*10 + 10
-
-                p.stdin.close()
-                ufload.progress("Restoring: 100%")
-                ufload.progress("Waiting for Postgres to finish restore")
-                rc = p.wait()
-            else:
-                ufload.progress("Would run: "+ str(cmd))
-                rc = 0
+            ufload.progress("Would run: "+ str(cmd))
+            rc = 0
 
         rcstr = "ok"
         if rc != 0:
@@ -237,7 +206,7 @@ def load_dump_into(args, db, f, sz):
 
             # clean up the temp file
             try:
-                os.unlink(fn)
+                os.unlink(tf.name)
             except OSError:
                 pass
         else:
@@ -518,6 +487,11 @@ def exists(args, db):
 # reloading the sync server when we don't need to.
 def get_sync_server_len(args, db='SYNC_SERVER_LOCAL'):
     try:
+        #First, check if the db already exists
+        exist = _run_out(args, mkpsql(args, 'SELECT 1 FROM information_schema.tables  WHERE table_catalog=\'%s\' AND table_schema=\'public\' AND table_name=\'about\';' % db))
+        if len(exist) < 3:
+            return -1;
+
         l = _run_out(args, mkpsql(args, 'select length from about', db))
         if len(l) < 1:
             return -1

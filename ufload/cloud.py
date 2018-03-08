@@ -221,8 +221,8 @@ def dlProgress(pct):
 # Returns a file-like-object
 #def openDumpInZip(path, fn, **kwargs):
 def openDumpInZip(fn):
-    file = open(fn, 'r')
-    z = zipfile.ZipFile(file)
+    #file = open(fn, 'r')
+    z = zipfile.ZipFile(fn)
     names = z.namelist()
     if len(names) == 0:
         logging.warn("Zipfile %s has no files in it." % fn)
@@ -230,7 +230,9 @@ def openDumpInZip(fn):
     if len(names) != 1:
         logging.warn("Zipfile %s has unexpected files in it: %s" % (fn, names))
         return None, 0
+
     return z.open(names[0]), z.getinfo(names[0]).file_size
+
 
 # An object that copies input to output, calling
 # the progress callback along the way.

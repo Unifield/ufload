@@ -229,7 +229,10 @@ def _multiRestore(args):
             db = _file_to_db(args, f.name)
             if db is None:
                 ufload.progress("Bad filename %s. Skipping." % f.name)
-                os.unlink(j[1])
+                try:
+                    os.unlink(j[1])
+                except:
+                    pass
                 continue
 
             rc = ufload.db.load_zip_into(args, db, j[1], sz)
@@ -242,9 +245,17 @@ def _multiRestore(args):
                 if args.notify:
                     subprocess.call([ args.notify, db ])
 
+                try:
+                    os.unlink(j[1])
+                except:
+                    pass
+
                 # We got a good load, so go to the next instance.
                 break
-            os.unlink(j[1])
+            try:
+                os.unlink(j[1])
+            except:
+                pass
 
     return 0, dbs
 
@@ -278,8 +289,9 @@ def _syncRestore(args, dbs):
                      auth=requests.auth.HTTPBasicAuth(args.syncuser, args.syncpw),
                      stream=True)
     if r.status_code != 200:
-	ufload.progress("HTTP GET error: %s" % r.status_code)
+        ufload.progress("HTTP GET error: %s" % r.status_code)
         return 1
+
     rc = ufload.db.load_dump_into(args, sdb, r.raw, sz)
     if rc != 0:
         return rc
