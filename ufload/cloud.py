@@ -32,6 +32,19 @@ def _decrypt(pwd):
         print sys.exc_info()[0]
 
 
+def instance_to_dir(instance):
+    #instance name ends with "_OCA"
+    if instance.endswith('_OCA'):
+        return '/personal/UF_OCA_msf_geneva_msf_org/'
+    #instance name starts with "OCB"
+    if instance.startswith('OCB'):
+        return '/personal/UF_OCB_msf_geneva_msf_org/'
+    #instance name starts with "OCG_"
+    if instance.startswith('OCG_'):
+        return '/personal/UF_OCG_msf_geneva_msf_org/'
+
+    return ''
+
 def get_cloud_info(args):
 
     #Cloud password is encrypted

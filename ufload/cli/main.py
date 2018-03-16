@@ -2,6 +2,7 @@ import ConfigParser, argparse, os, sys, oerplib
 import requests
 import requests.auth
 import subprocess
+import shutil
 
 import ufload
 
@@ -83,18 +84,23 @@ def _cmdRestore(args):
     if rc != 0:
         return rc
 
+    ss = 'SYNC_SERVER_LOCAL'
+    if args.ss:
+        ss = args.ss
+
     if args.sync:
         # Restore a sync server (LIGHT WITH MASTER)
         rc = _syncRestore(args, dbs)
 
-    if args.sync or args.autosync:
+    if args.sync or args.autosync or args.ss:
         # Update instances sync settings
         for db in dbs:
             ufload._progress("Connection settings for %s" % db)
             #Defines sync server connection settings on each instance
-            ufload.db.sync_server_settings(args, 'SYNC_SERVER_LOCAL', db)
-            #Connects each instance to the sync server (and sets pwd)
-            ufload.db.connect_instance_to_sync_server(args, 'SYNC_SERVER_LOCAL', db)
+            ufload.db.sync_server_settings(args, ss, db)
+            if args.sync or args.autosync:
+                #Connects each instance to the sync server (and sets pwd)
+                ufload.db.connect_instance_to_sync_server(args, ss, db)
 
     return rc
 
@@ -168,33 +174,77 @@ def _dirRestore(args):
         return 2, None
 
 def _multiRestore(args):
-    if not _required(args, [ 'user', 'pw', 'oc' ]):
+    if not _required(args, [ 'user', 'pw' ]):
         ufload.progress('With no -file or -dir argument, cloud credentials are mandatory.')
         return 2, None
 
     if args.i is None:
+        if not _required(args, 'oc'):
+            ufload.progress('With no -file or -dir argument, you must use -i or -oc.')
+            return 2, None
         ufload.progress("Multiple Instance restore for all instances in %s" % args.oc)
     else:
+        if not args.oc:
+            ufload.progress('Argument -oc not provided, please note that ufload will look for a OC pattern in the -i arguments (you might want to avoid partial substrings)')
         ufload.progress("Multiple Instance restore for instances matching: %s" % " or ".join(args.i))
+
+    #Create a temp directory to unzip files
+    try:
+        os.mkdir('ufload_temp')
+    except:
+        pass
+    #Change working directory
+    os.chdir('ufload_temp')
 
     #Cloud access
     info = ufload.cloud.get_cloud_info(args)
     ufload.progress('site=%s - path=%s - dir=%s' % (info.get('site'), info.get('path'), info.get('dir')))
     dav = ufload.cloud.get_onedrive_connection(args)
-    instances = ufload.cloud.list_files(user=info.get('login'),
-                                        pw=info.get('password'),
-                                        where=info.get('dir'),
-                                        instances=args.i,
-                                        dav=dav,
-                                        url=info.get('url'),
-                                        site=info.get('site'),
-                                        path=info.get('path'))
+
+    if not args.oc:
+        #foreach -i add the dir
+        dirs = []
+        instances = {}
+        baseurl = dav.baseurl.rstrip('/')
+        for substr in args.i:
+            dirs.append(ufload.cloud.instance_to_dir(substr))
+        #Remove duplicates
+        dirs = list(set(dirs))
+        #Get the list for every required OC
+        for dir in dirs:
+            dav.change_oc(baseurl, dir)
+            instances.update(ufload.cloud.list_files(user=info.get('login'),
+                                                     pw=info.get('password'),
+                                                     where=dir + args.cloud_path,
+                                                     instances=args.i,
+                                                     dav=dav,
+                                                     url=info.get('url'),
+                                                     site=dir,
+                                                     path=info.get('path')))
+    else:
+        instances = ufload.cloud.list_files(user=info.get('login'),
+                                            pw=info.get('password'),
+                                            where=info.get('dir'),
+                                            instances=args.i,
+                                            dav=dav,
+                                            url=info.get('url'),
+                                            site=info.get('site'),
+                                            path=info.get('path'))
     ufload.progress("Instances to be restored: %s" % ", ".join(instances.keys()))
     dbs=[]
     for i in instances:
         files_for_instance = instances[i]
         for j in files_for_instance:
             ufload.progress("Trying file %s" % j[1])
+            #If -oc is not known, change the connection settings according to the current instance
+            if not args.oc:
+                if i.endswith('_OCA'):
+                    dav.change_oc(baseurl, 'OCA')
+                elif i.startswith('OCB'):
+                    dav.change_oc(baseurl, 'OCB')
+                elif i.startswith('OCG_'):
+                    dav.change_oc(baseurl, 'OCG')
+
             filename = dav.download(j[0],j[1])
             n= ufload.cloud.peek_inside_local_file(j[0], filename)
             '''n = ufload.cloud.peek_inside_file(j[0], j[1],
@@ -257,13 +307,21 @@ def _multiRestore(args):
             except:
                 pass
 
+    try:
+        #Change directory
+        os.chdir('..')
+        #Remove temporary directory (and whatever is in it)
+        shutil.rmtree('ufload_temp', True)
+    except:
+        pass
+
     return 0, dbs
 
-def _syncRestore(args, dbs):
+def _syncRestore(args, dbs, ss):
     if args.db_prefix:
-        sdb = '%s_SYNC_SERVER_LOCAL' % args.db_prefix
+        sdb = '%s_%s' % (args.db_prefix, ss)
     else:
-        sdb = 'SYNC_SERVER_LOCAL'
+        sdb = ss
 
     url = "http://sync-prod_dump.uf5.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
     try:
@@ -384,7 +442,7 @@ def parse():
 
     parser.add_argument("-user", help="Cloud username")
     parser.add_argument("-pw", help="Cloud password")
-    parser.add_argument("-oc", help="Cloud directory (OCG, OCA, OCB accepted as shortcuts)")
+    parser.add_argument("-oc", help="OC (OCG, OCA and OCB accepted) - optional for the restore command (if not provided, ufload will try and deduce the right OC(s) from the name of the requested instances)")
 
     parser.add_argument("-syncuser", help="username to access the sync server backup")
     parser.add_argument("-syncpw", help="password to access the sync server backup")
@@ -419,7 +477,7 @@ def parse():
     pRestore.add_argument("-notify", dest='notify', help="run this script on each restored database")
     pRestore.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization on restored instances")
     pRestore.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade on restored instances")
-    #pRestore.add_argument("-ss", help="Instance name of the sync server (default = SYNC_SERVER_LOCAL)")
+    pRestore.add_argument("-ss", help="Instance name of the sync server (default = SYNC_SERVER_LOCAL)")
     pRestore.set_defaults(func=_cmdRestore)
     
     pArchive = sub.add_parser('archive', help="Copy new data into the database.")

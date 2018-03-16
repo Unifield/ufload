@@ -513,7 +513,7 @@ def connect_instance_to_sync_server(args, sync_server, db):
     #oerp = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=12173, version='6.0')
     ufload.progress('Connecting instance %s to %s' % (db, sync_server))
     #netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=12173, timeout=1000, version='6.0')
-    netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=8069, timeout=1000, version='6.0')
+    netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=8061, timeout=1000, version='6.0')
     netrpc.login(args.adminuser.lower(), args.adminpw, database=db)
     conn_manager = netrpc.get('sync.client.sync_server_connection')
     conn_ids = conn_manager.search([])
