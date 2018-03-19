@@ -440,15 +440,19 @@ def _db_to_instance(args, db):
         db = db[len(args.db_prefix)+1:]
     return '_'.join(db.split('_')[0:-2])
 
-def sync_link(args, hwid, db, sdb):
+def sync_link(args, hwid, db, sdb, all=False):
     instance = _db_to_instance(args, db)
     #Create the instance in the sync server if it does not already exist
     rc = psql(args, 'insert into sync_server_entity (create_uid, create_date, write_date, write_uid, user_id, name, state) SELECT 1, now(), now(), 1, 1, \'%s\', \'validated\' FROM sync_server_entity WHERE NOT EXISTS (SELECT 1 FROM sync_server_entity WHERE name = \'%s\') ' % (instance, instance), sdb )
     if rc != 0:
         return rc
 
-    #Update hardware id for this instance
-    return psql(args, 'update sync_server_entity set hardware_id = \'%s\' where name = \'%s\';' % (hwid, instance), sdb)
+    if all:
+        # Update hardware id for every instance
+        return psql(args, 'update sync_server_entity set hardware_id = \'%s\';' % hwid, sdb)
+    else:
+        #Update hardware id for this instance
+        return psql(args, 'update sync_server_entity set hardware_id = \'%s\' where name = \'%s\';' % (hwid, instance), sdb)
 
 # Remove all databases which come from the same instance as db
 def clean(args, db):

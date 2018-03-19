@@ -368,12 +368,20 @@ def _syncLink(args, dbs, sdb):
         ufload.progress("No hardware id available, you will need to manually link your instances to %s." % sdb)
         return 0
 
+    if args.ss:
+        #We don't update hardware id for all local instances: instances from another server could be already connected
+        all = False
+    else:
+        # We update hardware id for all local instances: it's a new sync server, so no instance is connected yet
+        all = True
+
     for db in dbs:
         ufload.progress("Updating hardware id and entity name for %s in sync server" % db)
-        rc = ufload.db.sync_link(args, hwid, db, sdb)   #Update hardware_id and entity name (of the instance) in sync server db
+        rc = ufload.db.sync_link(args, hwid, db, sdb, all)   #Update hardware_id and entity name (of the instance) in sync server db
         if rc != 0:
             return rc
     return 0
+
 
 def _cmdLs(args):
     if not _required(args, [ 'user', 'pw', 'oc' ]):
