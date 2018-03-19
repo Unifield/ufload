@@ -90,7 +90,7 @@ def _cmdRestore(args):
 
     if args.sync:
         # Restore a sync server (LIGHT WITH MASTER)
-        rc = _syncRestore(args, dbs)
+        rc = _syncRestore(args, dbs, ss)
 
     if args.sync or args.autosync or args.ss:
         # Update instances sync settings
@@ -179,7 +179,7 @@ def _multiRestore(args):
         return 2, None
 
     if args.i is None:
-        if not _required(args, 'oc'):
+        if not _required(args, [ 'oc' ]):
             ufload.progress('With no -file or -dir argument, you must use -i or -oc.')
             return 2, None
         ufload.progress("Multiple Instance restore for all instances in %s" % args.oc)
