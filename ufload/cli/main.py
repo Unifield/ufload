@@ -3,6 +3,7 @@ import requests
 import requests.auth
 import subprocess
 import shutil
+import time
 
 import ufload
 
@@ -14,6 +15,7 @@ def _home():
 _logs = []
 def _progress(p):
     global _logs
+    p = time.strftime('%H:%M:%S') + ': ' + p
     print >> sys.stderr, p
     _logs.append(p)
 
@@ -462,6 +464,7 @@ def parse():
     parser.add_argument("-db-prefix", help="Prefix to put on database names")
     parser.add_argument("-killconn", help="The command to run kill connections to the databases.")
     parser.add_argument("-remote", help="Remote log server")
+    parser.add_argument("-local-log", dest='local', help="Path to create a local log file")
     parser.add_argument("-n", dest='show', action='store_true', help="no real work; only show what would happen")
 
     sub = parser.add_subparsers(title='subcommands',
@@ -539,6 +542,18 @@ def main():
         ufload.progress("Will exit with result code: %d" % rc)
         ufload.progress("Posting logs to remote server.")
         requests.post(args.remote+"?who=%s"%hostname, data='\n'.join(_logs))
+
+    if args.local:
+        #Create directory if necessary
+        try:
+            os.stat(args.local)
+        except:
+            os.mkdir(args.local)
+        #Create log file (if it does not exist, else append to existing file)
+        filename = '%s/uf_%s.log' % (args.local, time.strftime('%Y%m%d'))
+        #Write logs to file
+        with open(filename, 'ab') as file:
+            file.write('\n'.join(_logs))
 
     sys.exit(rc)
 

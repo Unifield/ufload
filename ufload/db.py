@@ -101,6 +101,9 @@ def load_zip_into(args, db, f, sz):
         cmd.append(db2)
         cmd.append('-n')
         cmd.append('public')
+        cmd.append('-S')
+        cmd.append(args.db_user)
+        cmd.append('--disable-triggers')
 
         if not args.show:
 
@@ -131,6 +134,10 @@ def load_zip_into(args, db, f, sz):
         if rc != 0:
             rcstr = "error %d" % rc
         ufload.progress("Restore finished with result code: %s" % rcstr)
+        _checkrc(rc)
+
+        # Let's delete uninstalled versions
+        rc = psql(args, 'DELETE FROM sync_client_version WHERE state!=\"installed\"', db2)
         _checkrc(rc)
 
         _checkrc(delive(args, db2))
@@ -177,6 +184,9 @@ def load_dump_into(args, db, f, sz):
         cmd.append(db2)
         cmd.append('-n')
         cmd.append('public')
+        cmd.append('-S')
+        cmd.append(args.db_user)
+        cmd.append('--disable-triggers')
 
         # Windows pg_restore gets confused when reading from a pipe,
         # so write to a temp file first.
@@ -247,6 +257,10 @@ def load_dump_into(args, db, f, sz):
         ufload.progress("Restore finished with result code: %s" % rcstr)
         _checkrc(rc)
 
+        #Let's delete uninstalled versions
+        rc = psql(args, 'DELETE FROM sync_client_version WHERE state!=\"installed\"', db)
+        _checkrc(rc)
+
         _checkrc(delive(args, db2))
 
         ufload.progress("Drop database " + db)
@@ -302,6 +316,9 @@ def delive(args, db):
 
     # disable cron jobs
     rc = psql(args, 'update ir_cron set active = \'f\' where model = \'backup.config\';', db)
+    if rc != 0:
+        return rc
+    rc = psql(args, 'update ir_cron set active = \'f\' where model = \'msf.instance.cloud\';', db)
     if rc != 0:
         return rc
     rc = psql(args, 'update ir_cron set active = \'f\' where model = \'sync.client.entity\';', db)
@@ -465,7 +482,7 @@ def clean(args, db):
 
     for d in _allDbs(args):
         i = _db_to_instance(args, d)
-        if i and d not in toKeep and i in toClean:
+        if not args.db_prefix and i and d not in toKeep and i in toClean:
             ufload.progress("Cleaning other database for instance %s: %s" % (i, d))
             killCons(args, d)
             rc = psql(args, 'DROP DATABASE IF EXISTS \"%s\"'%d)
