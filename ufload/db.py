@@ -137,7 +137,7 @@ def load_zip_into(args, db, f, sz):
         _checkrc(rc)
 
         # Let's delete uninstalled versions
-        rc = psql(args, 'DELETE FROM sync_client_version WHERE state!=\"installed\"', db2)
+        rc = psql(args, 'DELETE FROM sync_server_version WHERE state!=\'installed\'', db2)
         _checkrc(rc)
 
         _checkrc(delive(args, db2))
@@ -258,7 +258,7 @@ def load_dump_into(args, db, f, sz):
         _checkrc(rc)
 
         #Let's delete uninstalled versions
-        rc = psql(args, 'DELETE FROM sync_client_version WHERE state!=\"installed\"', db)
+        rc = psql(args, 'DELETE FROM sync_server_version WHERE state!=\"installed\"', db)
         _checkrc(rc)
 
         _checkrc(delive(args, db2))
