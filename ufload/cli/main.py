@@ -4,6 +4,7 @@ import requests.auth
 import subprocess
 import shutil
 import time
+import re
 
 import ufload
 
@@ -13,11 +14,25 @@ def _home():
     return os.environ['HOME']
 
 _logs = []
+args=[]
 def _progress(p):
-    global _logs
+    global _logs, args
     p = time.strftime('%H:%M:%S') + ': ' + p
     print >> sys.stderr, p
     _logs.append(p)
+
+    if args.local:
+        #Create directory if necessary
+        try:
+            os.stat(args.local)
+        except:
+            os.mkdir(args.local)
+        #Create log file (if it does not exist, else append to existing file)
+        filename = '%s/uf_%s.log' % (args.local, time.strftime('%Y%m%d'))
+        #Write logs to file
+        with open(filename, 'ab') as file:
+            #file.write('\n'.join(_logs))
+            file.write('%s\n' % p)
 
 ufload.progress = _progress
 
@@ -190,6 +205,13 @@ def _multiRestore(args):
             ufload.progress('Argument -oc not provided, please note that ufload will look for a OC pattern in the -i arguments (you might want to avoid partial substrings)')
         ufload.progress("Multiple Instance restore for instances matching: %s" % " or ".join(args.i))
 
+    if args.workingdir:
+        try:
+            os.mkdir(args.workingdir)
+        except:
+            pass
+        os.chdir(args.workingdir)
+
     #Create a temp directory to unzip files
     try:
         os.mkdir('ufload_temp')
@@ -234,9 +256,16 @@ def _multiRestore(args):
                                             path=info.get('path'))
     ufload.progress("Instances to be restored: %s" % ", ".join(instances.keys()))
     dbs=[]
+    pattern = re.compile('.*-[A-Z]{1}[a-z]{2}\.zip$')
+
     for i in instances:
         files_for_instance = instances[i]
         for j in files_for_instance:
+
+            #If filename doesn't match UniField auto-upload filename pattern, go to next file
+            if not pattern.match(j[1]):
+                continue
+
             ufload.progress("Trying file %s" % j[1])
             #If -oc is not known, change the connection settings according to the current instance
             if not args.oc:
@@ -273,14 +302,14 @@ def _multiRestore(args):
                                            pw=args.pw,
                                            where=_ocToDir(args.oc))
             '''
-            f, sz = ufload.cloud.openDumpInZip(j[1])
-            if f is None:
+            fname, sz = ufload.cloud.openDumpInZip(j[1])
+            if fname is None:
                 os.unlink(j[1])
                 continue
 
-            db = _file_to_db(args, f.name)
+            db = _file_to_db(args, fname)
             if db is None:
-                ufload.progress("Bad filename %s. Skipping." % f.name)
+                ufload.progress("Bad filename %s. Skipping." % fname)
                 try:
                     os.unlink(j[1])
                 except:
@@ -306,7 +335,7 @@ def _multiRestore(args):
                 break
             try:
                 os.unlink(j[1])
-            except:
+            except Exception as ex:
                 pass
 
     try:
@@ -489,6 +518,7 @@ def parse():
     pRestore.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization on restored instances")
     pRestore.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade on restored instances")
     pRestore.add_argument("-ss", help="Instance name of the sync server (default = SYNC_SERVER_LOCAL)")
+    pRestore.add_argument("-workingdir", dest='workingdir', help="the working directory used for downloading and unzipping the files (optional)")
     pRestore.set_defaults(func=_cmdRestore)
     
     pArchive = sub.add_parser('archive', help="Copy new data into the database.")
@@ -529,6 +559,7 @@ def parse():
     return parser.parse_args()
 
 def main():
+    global args
     args = parse()
     if hasattr(args, "func"):
         try:
@@ -542,18 +573,6 @@ def main():
         ufload.progress("Will exit with result code: %d" % rc)
         ufload.progress("Posting logs to remote server.")
         requests.post(args.remote+"?who=%s"%hostname, data='\n'.join(_logs))
-
-    if args.local:
-        #Create directory if necessary
-        try:
-            os.stat(args.local)
-        except:
-            os.mkdir(args.local)
-        #Create log file (if it does not exist, else append to existing file)
-        filename = '%s/uf_%s.log' % (args.local, time.strftime('%Y%m%d'))
-        #Write logs to file
-        with open(filename, 'ab') as file:
-            file.write('\n'.join(_logs))
 
     sys.exit(rc)
 

@@ -106,11 +106,15 @@ def load_zip_into(args, db, f, sz):
         cmd.append('--disable-triggers')
 
         if not args.show:
-
-            z = zipfile.ZipFile(f)
-            names = z.namelist()
-            fn = names[0]
-            z.extract(fn)
+            with open(f, 'rb') as fileobj:
+                z = zipfile.ZipFile(fileobj)
+                names = z.namelist()
+                fn = names[0]
+                #z.extract(fn)
+                z.extractall()
+                z.close()
+                del z
+            os.unlink(f)
 
             cmd.append(fn)
 
@@ -137,7 +141,7 @@ def load_zip_into(args, db, f, sz):
         _checkrc(rc)
 
         # Let's delete uninstalled versions
-        rc = psql(args, 'DELETE FROM sync_server_version WHERE state!=\'installed\'', db2)
+        rc = psql(args, 'DELETE FROM sync_client_version WHERE state!=\'installed\'', db2)
         _checkrc(rc)
 
         _checkrc(delive(args, db2))
@@ -257,9 +261,9 @@ def load_dump_into(args, db, f, sz):
         ufload.progress("Restore finished with result code: %s" % rcstr)
         _checkrc(rc)
 
-        #Let's delete uninstalled versions
-        rc = psql(args, 'DELETE FROM sync_server_version WHERE state!=\"installed\"', db)
-        _checkrc(rc)
+        #USELESS FOR SYNC SERVER Let's delete uninstalled versions
+        #rc = psql(args, 'DELETE FROM sync_server_version WHERE state!=\'installed\'', db)
+        #_checkrc(rc)
 
         _checkrc(delive(args, db2))
 
@@ -275,7 +279,7 @@ def load_dump_into(args, db, f, sz):
         return 0
     except dbException as e:
         # something went wrong, so drop the temp table
-        ufload.progress("Cleanup: dropping table %s" % db2)
+        ufload.progress("Cleanup: dropping db %s" % db2)
         killCons(args, db2)
         psql(args, 'DROP DATABASE \"%s\"' % db2)
         return e.rc
@@ -482,7 +486,8 @@ def clean(args, db):
 
     for d in _allDbs(args):
         i = _db_to_instance(args, d)
-        if not args.db_prefix and i and d not in toKeep and i in toClean:
+        #if not args.db_prefix and i and d not in toKeep and i in toClean:
+        if i and d not in toKeep and i in toClean:
             ufload.progress("Cleaning other database for instance %s: %s" % (i, d))
             killCons(args, d)
             rc = psql(args, 'DROP DATABASE IF EXISTS \"%s\"'%d)
@@ -531,6 +536,9 @@ def sync_server_settings(args, sync_server, db):
     _run_out(args, mkpsql(args, 'update sync_client_sync_server_connection set database = \'%s\', login=\'%s\' user_id = 1;' % (sync_server, args.adminuser.lower()) , db))
 
 def connect_instance_to_sync_server(args, sync_server, db):
+    #Temporary desactivation of auto-connect
+    #return 0
+
     #oerp = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=12173, version='6.0')
     ufload.progress('Connecting instance %s to %s' % (db, sync_server))
     #netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=12173, timeout=1000, version='6.0')
@@ -541,6 +549,7 @@ def connect_instance_to_sync_server(args, sync_server, db):
     conn_manager.write(conn_ids, {'password': args.adminpw})
     conn_manager.connect()
     #netrpc.get('sync.client.entity').sync()
+
 
 def _parse_dsn(dsn):
     res = {}

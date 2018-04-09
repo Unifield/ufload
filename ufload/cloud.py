@@ -198,6 +198,7 @@ def peek_inside_local_file(path, fn):
         return None
     n = names[0]
     z.close()
+    del z
     return n
 
 
@@ -244,7 +245,16 @@ def openDumpInZip(fn):
         logging.warn("Zipfile %s has unexpected files in it: %s" % (fn, names))
         return None, 0
 
-    return z.open(names[0]), z.getinfo(names[0]).file_size
+    file = z.open(names[0])
+    filename = file.name
+    size = z.getinfo(names[0]).file_size
+    file.close()
+    z.close()
+    del file
+    del z
+
+    #return z.open(names[0]), z.getinfo(names[0]).file_size
+    return filename, size
 
 
 # An object that copies input to output, calling
