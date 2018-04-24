@@ -354,7 +354,8 @@ def _syncRestore(args, dbs, ss):
     else:
         sdb = ss
 
-    url = "http://sync-prod_dump.uf5.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
+    #url = "http://sync-prod_dump.uf5.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
+    url = "http://sync-prod_dump.rb.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
     try:
         r = requests.head(url,
                           auth=requests.auth.HTTPBasicAuth(args.syncuser, args.syncpw))

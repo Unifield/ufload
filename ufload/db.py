@@ -476,8 +476,12 @@ def _db_to_instance(args, db):
     if args.db_prefix:
         db = db[len(args.db_prefix)+1:]
 
-    if (db == args.ss):
-        return args.ss
+    ss = 'SYNC_SERVER_LOCAL'
+    if args.ss:
+        ss = args.ss
+
+    if db.startswith(ss):
+        return ss
 
     return '_'.join(db.split('_')[0:-2])
 
