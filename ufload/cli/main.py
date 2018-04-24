@@ -386,6 +386,9 @@ def _syncRestore(args, dbs, ss):
         return rc
     ufload.db.write_sync_server_len(args, sz, sdb)
 
+    if not args.noclean:
+        rc = ufload.db.clean(args, sdb)
+
     return _syncLink(args, dbs, sdb)
 
 # separate function to make testing easier
@@ -399,7 +402,7 @@ def _syncLink(args, dbs, sdb):
         ufload.progress("No hardware id available, you will need to manually link your instances to %s." % sdb)
         return 0
 
-    if args.ss:
+    if args.ss and args.sync is None:
         #We don't update hardware id for all local instances: instances from another server could be already connected
         all = False
     else:
@@ -566,6 +569,8 @@ def main():
             rc = args.func(args)
         except KeyboardInterrupt:
             rc = 1
+
+    ufload.progress("ufload is done working :)")
 
     if args.remote:
         import socket

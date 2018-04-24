@@ -152,11 +152,20 @@ def load_zip_into(args, db, f, sz):
         _checkrc(rc)
 
         ufload.progress("Rename database %s to %s" % (db2, db))
-        rc = psql(args, 'ALTER DATABASE \"%s\" RENAME TO \"%s\"'%(db2, db))
+        rc = psql(args, 'ALTER DATABASE \"%s\" RENAME TO \"%s\"' % (db2, db))
         _checkrc(rc)
-        
+
+        for d in _allDbs(args):
+            if d.startswith(db) and d>db:
+                ufload.progress("Cleaning other database for instance %s: %s" % (db, d))
+                killCons(args, d)
+                rc = psql(args, 'DROP DATABASE IF EXISTS \"%s\"' % d)
+                if rc != 0:
+                    return rc
+
         return 0
     except Exception as e:
+        ufload.progress("Unexpected error %s" % sys.exc_info()[0])
         # something went wrong, so drop the temp table
         ufload.progress("Cleanup: dropping table %s" % db2)
         killCons(args, db2)
@@ -279,10 +288,17 @@ def load_dump_into(args, db, f, sz):
         return 0
     except dbException as e:
         # something went wrong, so drop the temp table
+        ufload.progress("Unexpected error %s" % sys.exc_info()[0])
         ufload.progress("Cleanup: dropping db %s" % db2)
         killCons(args, db2)
         psql(args, 'DROP DATABASE \"%s\"' % db2)
         return e.rc
+    except:
+        ufload.progress("Unexpected error %s" % sys.exc_info()[0])
+        ufload.progress("Cleanup: dropping db %s" % db2)
+        killCons(args, db2)
+        psql(args, 'DROP DATABASE \"%s\"' % db2)
+        return 1
 
 # De-live uses psql to change a restored database taken from a live backup
 # into a non-production, non-live database. It:
@@ -459,6 +475,10 @@ def get_hwid(args):
 def _db_to_instance(args, db):
     if args.db_prefix:
         db = db[len(args.db_prefix)+1:]
+
+    if (db == args.ss):
+        return args.ss
+
     return '_'.join(db.split('_')[0:-2])
 
 def sync_link(args, hwid, db, sdb, all=False):
