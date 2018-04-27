@@ -231,7 +231,7 @@ def _multiRestore(args):
         instances = {}
         baseurl = dav.baseurl.rstrip('/')
         for substr in args.i:
-            if not ufload.cloud._match_instance_name(args.exclude, substr):
+            if args.exclude is None or not ufload.cloud._match_instance_name(args.exclude, substr):
                 dirs.append(ufload.cloud.instance_to_dir(substr))
         #Remove duplicates
         dirs = list(set(dirs))
@@ -260,7 +260,7 @@ def _multiRestore(args):
     pattern = re.compile('.*-[A-Z]{1}[a-z]{2}\.zip$')
 
     for i in instances:
-        if ufload.cloud._match_instance_name(args.exclude, i):
+        if args.exclude is not None and ufload.cloud._match_instance_name(args.exclude, i):
             ufload._progress("%s matches -exclude param %s and will not be processed" % (i,args.exclude))
             continue
 
@@ -527,7 +527,7 @@ def parse():
     pRestore.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization on restored instances")
     pRestore.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade on restored instances")
     pRestore.add_argument("-ss", help="Instance name of the sync server (default = SYNC_SERVER_LOCAL)")
-    pRestore.add_argument("-exclude", help="instances to exclude (matched as a substring) - only without -i")
+    pRestore.add_argument("-exclude", help="instance to exclude (matched as a substring) - only without -i")
     pRestore.add_argument("-workingdir", dest='workingdir', help="the working directory used for downloading and unzipping the files (optional)")
     pRestore.set_defaults(func=_cmdRestore)
     
