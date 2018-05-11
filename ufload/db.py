@@ -149,6 +149,8 @@ def load_zip_into(args, db, f, sz):
         ufload.progress("Drop database "+db)
         killCons(args, db)
         rc = psql(args, 'DROP DATABASE IF EXISTS \"%s\"'%db)
+        # First, revoke CONNECT rights to the DB so there won't be any auto-connect issues
+        psql(args, 'GRANT CONNECT ON DATABASE %s FROM public' % db, 'postgres', True)
         _checkrc(rc)
 
         ufload.progress("Rename database %s to %s" % (db2, db))
@@ -156,7 +158,7 @@ def load_zip_into(args, db, f, sz):
         _checkrc(rc)
 
         for d in _allDbs(args):
-            if d.startswith(db) and d>db:
+            if d.startswith(db) and d!=db:
                 ufload.progress("Cleaning other database for instance %s: %s" % (db, d))
                 killCons(args, d)
                 rc = psql(args, 'DROP DATABASE IF EXISTS \"%s\"' % d)
@@ -432,6 +434,9 @@ def killCons(args, db):
     if args.killconn:
         _run(args, [ 'sh', '-c', args.killconn])
         return
+
+    # First, revoke CONNECT rights to the DB so there won't be any auto-connect issues
+    psql(args, 'REVOKE CONNECT ON DATABASE %s FROM public' % db, 'postgres', True)
 
     # For Postgres 8, it is procpid, for 9 it is pid
     v = ver(args)
