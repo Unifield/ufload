@@ -343,6 +343,9 @@ def _multiRestore(args):
             except Exception as ex:
                 pass
 
+    if args.ss and args.sync is None:
+        _syncLink(args, dbs, args.ss)
+
     try:
         #Change directory
         os.chdir('..')
