@@ -39,6 +39,9 @@ def instance_to_dir(instance):
     #instance name starts with "OCB"
     if instance.startswith('OCB'):
         return '/personal/UF_OCB_msf_geneva_msf_org/'
+    # instance name starts with "OCB"
+    if instance.startswith('OCP'):
+        return '/personal/UF_OCP_msf_geneva_msf_org/'
     #instance name starts with "OCG_"
     if instance.startswith('OCG_'):
         return '/personal/UF_OCG_msf_geneva_msf_org/'
