@@ -105,11 +105,11 @@ def _cmdRestore(args):
     if args.ss:
         ss = args.ss
 
-    if args.sync:
+    if args.sync or args.synclight:
         # Restore a sync server (LIGHT WITH MASTER)
         rc = _syncRestore(args, dbs, ss)
 
-    if args.sync or args.autosync or args.ss:
+    if args.sync or args.synclight or args.autosync or args.ss:
         # Update instances sync settings
         for db in dbs:
             ufload._progress("Connection settings for %s" % db)
@@ -282,6 +282,10 @@ def _multiRestore(args):
                     dav.change_oc(baseurl, 'OCG')
 
             filename = dav.download(j[0],j[1])
+
+            filesize = os.path.getsize(filename) / (1024 * 1024)  # A TESTER !!!
+            ufload.progress("File size: %s Mb" % filesize)
+
             n= ufload.cloud.peek_inside_local_file(j[0], filename)
             '''n = ufload.cloud.peek_inside_file(j[0], j[1],
                                            user=args.user,
@@ -362,8 +366,13 @@ def _syncRestore(args, dbs, ss):
     else:
         sdb = ss
 
-    #url = "http://sync-prod_dump.uf5.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
-    url = "http://sync-prod_dump.rb.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
+    #Which Sync Server do we need?
+    if args.synclight:
+        #url = "http://sync-prod_dump.uf5.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
+        url = "http://sync-prod_dump.rb.unifield.org/SYNC_SERVER_LIGHT_NO_UPDATE"
+    else:
+        url = "http://sync-prod_dump.rb.unifield.org/SYNC_SERVER_LIGHT_WITH_MASTER"
+
     try:
         r = requests.head(url,
                           auth=requests.auth.HTTPBasicAuth(args.syncuser, args.syncpw))
@@ -526,6 +535,7 @@ def parse():
     pRestore.add_argument("-live", dest='live', action='store_true', help="do not take the normal actions to make a restore into a non-production instance")
     pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
     pRestore.add_argument("-load-sync-server", dest='sync', action='store_true', help="set up a local sync server and connects the restored instance(s) to it")
+    pRestore.add_argument("-load-sync-server-no-update", dest='synclight', action='store_true', help="set up a light local sync server and connects the restored instance(s) to it")
     pRestore.add_argument("-notify", dest='notify', help="run this script on each restored database")
     pRestore.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization on restored instances")
     pRestore.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade on restored instances")
