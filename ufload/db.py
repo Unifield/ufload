@@ -157,6 +157,9 @@ def load_zip_into(args, db, f, sz):
         rc = psql(args, 'ALTER DATABASE \"%s\" RENAME TO \"%s\"' % (db2, db))
         _checkrc(rc)
 
+        # analyze db
+        psql(args, 'analyze', db, silent=True)
+
         for d in _allDbs(args):
             if d.startswith(db) and d!=db:
                 ufload.progress("Cleaning other database for instance %s: %s" % (db, d))
