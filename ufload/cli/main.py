@@ -506,6 +506,7 @@ def parse():
 
     parser.add_argument("-syncuser", help="username to access the sync server backup")
     parser.add_argument("-syncpw", help="password to access the sync server backup")
+    parser.add_argument("-sync-xmlrpcport", help="xmlrpc port used to connect the instance to the sync server")
 
     parser.add_argument("-db-host", help="Postgres host")
     parser.add_argument("-db-port", help="Postgres port")
