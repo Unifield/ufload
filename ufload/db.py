@@ -157,6 +157,9 @@ def load_zip_into(args, db, f, sz):
         rc = psql(args, 'ALTER DATABASE \"%s\" RENAME TO \"%s\"' % (db2, db))
         _checkrc(rc)
 
+        # analyze db
+        psql(args, 'analyze', db, silent=True)
+
         for d in _allDbs(args):
             if d.startswith(db) and d!=db:
                 ufload.progress("Cleaning other database for instance %s: %s" % (db, d))
@@ -317,19 +320,12 @@ def delive(args, db):
     
     adminuser = args.adminuser.lower()
     port = 8069
+    if args.sync_xmlrpcport:
+        port = int(args.sync_xmlrpcport)
 
     # change the sync config to local
     if args.db_prefix:
         pfx = args.db_prefix + '_'
-
-        # This is a gross hack, but it is the easiest way to find these
-        # different port numbers per runbot.
-        if args.db_prefix == 'oca':
-            port = 12183
-        if args.db_prefix == 'ocb':
-            port = 12173
-        if args.db_prefix == 'ocg':
-            port = 12153
     else:
         pfx = ''
     rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = \'f\', protocol = \'xmlrpc\', login = \'%s\', database = \'%sSYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, port), db)
