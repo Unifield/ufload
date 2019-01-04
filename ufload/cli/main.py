@@ -283,7 +283,7 @@ def _multiRestore(args):
 
             filename = dav.download(j[0],j[1])
 
-            filesize = os.path.getsize(filename) / (1024 * 1024)  # A TESTER !!!
+            filesize = os.path.getsize(filename) / (1024 * 1024)
             ufload.progress("File size: %s Mb" % filesize)
 
             n= ufload.cloud.peek_inside_local_file(j[0], filename)
@@ -463,6 +463,17 @@ def _cmdLs(args):
 
     return 0
 
+def _cmdClean(args):
+    nb = ufload.db.cleanDbs(args)
+    if nb==1:
+        ufload._progress('One database has been deleted')
+    elif nb>1:
+        ufload._progress('%s databases have been deleted' % nb)
+    else:
+        ufload._progress('No database to delete found')
+
+    return 0
+
 def _cmdUpgrade(args):
     if not _required(args, [ 'patch', 'version', 'adminuser', 'adminpw' ]):
         return 2
@@ -540,6 +551,7 @@ def parse():
     pRestore.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization on restored instances")
     pRestore.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade on restored instances")
     pRestore.add_argument("-ss", help="Instance name of the sync server (default = SYNC_SERVER_LOCAL)")
+    pRestore.add_argument("-rebuild-indexes", dest="analyze", action="store_true", help="Rebuild indexes after restore to enhance db performances")
     pRestore.add_argument("-exclude", help="instance to exclude (matched as a substring) - only without -i")
     pRestore.add_argument("-workingdir", dest='workingdir', help="the working directory used for downloading and unzipping the files (optional)")
     pRestore.set_defaults(func=_cmdRestore)
@@ -557,8 +569,11 @@ def parse():
     pUpgrade.add_argument("-i", action="append", help="Instances to upgrade programmatically (matched as a substring, default = all). Other instances will be upgraded at login")
     pUpgrade.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization")
     pUpgrade.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade")
-
     pUpgrade.set_defaults(func=_cmdUpgrade)
+
+    pClean = sub.add_parser('clean', help="Clean DBs with a wrong name format")
+    #pClean.add_argument("-i", action="append", help="instances to work on (matched as a substring, default = all)")
+    pClean.set_defaults(func=_cmdClean)
 
     # read from $HOME/.ufload first
     conffile = ConfigParser.SafeConfigParser()

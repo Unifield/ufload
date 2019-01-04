@@ -144,6 +144,12 @@ def load_zip_into(args, db, f, sz):
         rc = psql(args, 'DELETE FROM sync_client_version WHERE state!=\'installed\'', db2)
         _checkrc(rc)
 
+        # Analyze DB to optimize queries (rebuild indexes...)
+        if args.analyze:
+            ufload.progress("Analyzing database %s and rebuilding indexes" % db2)
+            rc = psql(args, 'ANALYZE', db2)
+            _checkrc(rc)
+
         _checkrc(delive(args, db2))
         
         ufload.progress("Drop database "+db)
@@ -490,12 +496,37 @@ def _db_to_instance(args, db):
 
     return '_'.join(db.split('_')[0:-2])
 
+def cleanDbs(args):
+
+    import re
+    p = re.compile('[A-Z0-9_]+_[0-9]{8}_[0-9]{4}$')
+    ps = re.compile('SYNC')
+
+    nb = 0
+    for d in _allDbs(args):
+
+        m = p.match(d)
+        ms = ps.search(d)
+
+        if m == None and ms == None and d != '':
+            ufload.progress("Dropping database %s" % d)
+            killCons(args, d)
+            rc = psql(args, 'DROP DATABASE IF EXISTS \"%s\"'%d)
+            if rc != 0:
+                ufload.progress("Error: unable to drop database %s" % d)
+            else:
+                nb = nb + 1
+
+    return nb
+
 def sync_link(args, hwid, db, sdb, all=False):
     instance = _db_to_instance(args, db)
     #Create the instance in the sync server if it does not already exist
     rc = psql(args, 'insert into sync_server_entity (create_uid, create_date, write_date, write_uid, user_id, name, state) SELECT 1, now(), now(), 1, 1, \'%s\', \'validated\' FROM sync_server_entity WHERE NOT EXISTS (SELECT 1 FROM sync_server_entity WHERE name = \'%s\') ' % (instance, instance), sdb )
+
     if rc != 0:
-        return rc
+        ufload.progress('Unable to create the instance %s on the sync server. Please add it manually.' % instance)
+        #return rc
 
     if all:
         # Update hardware id for every instance
