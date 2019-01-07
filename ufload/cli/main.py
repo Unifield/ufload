@@ -280,6 +280,8 @@ def _multiRestore(args):
                     dav.change_oc(baseurl, 'OCB')
                 elif i.startswith('OCG_'):
                     dav.change_oc(baseurl, 'OCG')
+                elif i.startswith('OCP_'):
+                    dav.change_oc(baseurl, 'OCP')
 
             filename = dav.download(j[0],j[1])
 

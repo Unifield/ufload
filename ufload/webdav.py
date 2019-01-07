@@ -51,6 +51,8 @@ class Client(object):
             dir = '/personal/UF_OCB_msf_geneva_msf_org/'
         elif dir == 'OCG':
             dir = '/personal/UF_OCG_msf_geneva_msf_org/'
+        elif dir == 'OCP':
+            dir = '/personal/UF_OCP_msf_geneva_msf_org/'
 
         self.baseurl = baseurl + dir
 
