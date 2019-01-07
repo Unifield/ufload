@@ -499,7 +499,7 @@ def _db_to_instance(args, db):
 def cleanDbs(args):
 
     import re
-    p = re.compile('[A-Z0-9_]+_[0-9]{8}_[0-9]{4}$')
+    p = re.compile('^[A-Z0-9_]{8,}_[0-9]{8}_[0-9]{4}$')
     ps = re.compile('SYNC')
 
     nb = 0
