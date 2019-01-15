@@ -323,7 +323,7 @@ def delive(args, db):
         if args.sync:
             ufload.progress("(please note that ufload is not able to connect to the sync server using live passwords, please connect manually)")
         return 0
-    
+
     adminuser = args.adminuser.lower()
     port = 8069
     if args.sync_xmlrpcport:
@@ -374,14 +374,14 @@ def delive(args, db):
     if sys.platform != "win32" and args.db_host in [ None, 'ct0', 'localhost' ]:
         # when loading on non-windows, to a local database, use /tmp
         directory = '\'/tmp\''
-    
+
     rc = psql(args, 'update backup_config set beforemanualsync=\'f\', beforepatching=\'f\', aftermanualsync=\'f\', beforeautomaticsync=\'f\', afterautomaticsync=\'f\', name = %s;' % directory, db)
     if rc != 0:
         return rc
 
     if args.nopwreset:
         ufload.progress("*** WARNING: The restored database has LIVE passwords.")
-	return 0
+        return 0
 
     # set the username of the admin account
     rc = psql(args, 'update res_users set login = \'%s\' where id = 1;' % adminuser, db)
@@ -392,6 +392,22 @@ def delive(args, db):
     rc = psql(args, 'update res_users set password = \'%s\';' % args.adminpw, db)
     if rc != 0:
         return rc
+
+    if args.inactiveusers:
+        rc = psql(args, "update res_users set active = 'f' where login not in ('synch', '%s');" % adminuser, db)
+
+    if args.createusers:
+        for new_user_info in args.createusers.split(';'):
+            new_user, groups = new_user_info.split(':')
+            rc, new_userid = psql(args, """ insert into res_users (name, active, login, password, context_lang, company_id, view, menu_id) values
+                ('%s', 't', '%s', '%s', 'en_MF', 1, 'simple', 1) returning id;"""
+                % (new_user, new_user.lower(), args.adminpw), db, silent=True)
+            if rc != 0:
+                return rc
+            for new_group in  groups.split(','):
+                rc = psql(args, " insert into res_groups_users_rel (uid, gid) (select %s, id from res_groups where name='%s');" % (new_userid, new_group), db)
+                if rc != 0:
+                    return rc
 
     # ok, delive finished with no problems
     return 0

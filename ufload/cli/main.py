@@ -545,6 +545,8 @@ def parse():
     pRestore.add_argument("-dir", help="the directory holding the files to restore (disabled cloud downloading)")
     pRestore.add_argument("-adminuser", default='admin', help="the new admin username in the newly restored database")
     pRestore.add_argument("-adminpw", default='admin', help="the password to set into the newly restored database")
+    pRestore.add_argument("-inactiveusers", action='store_true', help="inactive users (except admin)")
+    pRestore.add_argument("-createusers", dest='createusers', help="list of new users to create: user1:group1,group2;user2:group3,group4")
     pRestore.add_argument("-nopwreset", dest='nopwreset', action='store_true', help="do not change any passwords")
     pRestore.add_argument("-live", dest='live', action='store_true', help="do not take the normal actions to make a restore into a non-production instance")
     pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
