@@ -428,6 +428,7 @@ def _syncLink(args, dbs, sdb):
     else:
         # We update hardware id for all local instances: it's a new sync server, so no instance is connected yet
         all = True
+        ufload.db.psql(args, 'update sync_server_entity set hardware_id = \'%s\';' % hwid, sdb)
 
     for db in dbs:
         ufload.progress("Updating hardware id and entity name for %s in sync server" % db)
