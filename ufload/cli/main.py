@@ -67,10 +67,14 @@ def _file_to_db(args, fn):
     x = fn.split('-')
     #if len(x) < 2 or len(x[2]) != 6:
     #    return None
-    if len(x) > 1 and len(x[2]) == 6:
+
+    if len(x) > 0 and args.nosuffix:
+        db = x[0]
+    elif len(x) > 1 and len(x[2]) == 6:
         db = "_".join([ x[0], x[1], x[2][0:4]])
     else:
         db = fn[:-5]
+
     if args.db_prefix:
         return args.db_prefix + "_" + db
     return db
@@ -549,6 +553,7 @@ def parse():
     pRestore.add_argument("-nopwreset", dest='nopwreset', action='store_true', help="do not change any passwords")
     pRestore.add_argument("-live", dest='live', action='store_true', help="do not take the normal actions to make a restore into a non-production instance")
     pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
+    pRestore.add_argument("-no-suffix", dest='nosuffix',help="remove the date and time numbers at the end of DB name")
     pRestore.add_argument("-load-sync-server", dest='sync', action='store_true', help="set up a local sync server and connects the restored instance(s) to it")
     pRestore.add_argument("-load-sync-server-no-update", dest='synclight', action='store_true', help="set up a light local sync server and connects the restored instance(s) to it")
     pRestore.add_argument("-notify", dest='notify', help="run this script on each restored database")
