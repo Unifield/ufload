@@ -119,7 +119,7 @@ def _cmdRestore(args):
             ufload._progress("Connection settings for %s" % db)
             #Defines sync server connection settings on each instance
             ufload.db.sync_server_settings(args, ss, db)
-            if args.sync or args.autosync:
+            if args.sync or args.autosync or args.synclight:
                 #Connects each instance to the sync server (and sets pwd)
                 ufload.db.connect_instance_to_sync_server(args, ss, db)
 
