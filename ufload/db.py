@@ -686,7 +686,7 @@ def _zipContents(path):
     #with open(path, 'rb') as f:
     #    contents = f.read()
     #return [buffer(contents)]
-    z = zipfile.ZipFile(path, "rb")
+    z = zipfile.ZipFile(path, "r")
     for filename in z.namelist():
         bytes = z.read(filename)
         return bytes
