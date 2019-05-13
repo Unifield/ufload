@@ -683,9 +683,13 @@ def _zipChecksum(path):
 
 def _zipContents(path):
     ufload.progress("Reading patch contents")
-    with open(path, 'rb') as f:
-        contents = f.read()
-    return [buffer(contents)]
+    #with open(path, 'rb') as f:
+    #    contents = f.read()
+    #return [buffer(contents)]
+    z = zipfile.ZipFile(path, "rb")
+    for filename in z.namelist():
+        bytes = z.read(filename)
+        return bytes
 
 
 def installPatch(args, db='SYNC_SERVER_LOCAL'):
