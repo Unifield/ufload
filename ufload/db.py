@@ -1,4 +1,4 @@
-import os, sys, subprocess, tempfile, hashlib, urllib, oerplib, zipfile
+import os, sys, subprocess, tempfile, hashlib, urllib, oerplib, zipfile, base64
 import ufload
 
 def _run_out(args, cmd):
@@ -74,8 +74,20 @@ def mkpsql(args, sql, db='postgres'):
     cmd.append(db)
     return cmd
 
+def mkpsql_file(args, file, db='postgres'):
+    cmd = [ _find_exe('psql') ] + pg_common(args)
+    cmd.append('-q')
+    cmd.append('-t')
+    cmd.append('-c')
+    cmd.append('--file=%s' % file)
+    cmd.append(db)
+    return cmd
+
 def psql(args, sql, db='postgres', silent=False):
     return _run(args, mkpsql(args, sql, db), silent)
+
+def psql_file(args, file, db='postgres', silent=False):
+    return _run(args, mkpsql_file(args, file, db), silent)
     
 def load_zip_into(args, db, f, sz):
     tot = float(sz)
@@ -683,13 +695,11 @@ def _zipChecksum(path):
 
 def _zipContents(path):
     ufload.progress("Reading patch contents")
-    #with open(path, 'rb') as f:
-    #    contents = f.read()
-    #return [buffer(contents)]
-    z = zipfile.ZipFile(path, "r")
-    for filename in z.namelist():
-        bytes = z.read(filename)
-        return bytes
+    with open(path, 'rb') as f:
+        contents = f.read()
+        return buffer(contents)
+    #return contents
+
 
 
 def installPatch(args, db='SYNC_SERVER_LOCAL'):
@@ -705,9 +715,17 @@ def installPatch(args, db='SYNC_SERVER_LOCAL'):
     patch = os.path.normpath(args.patch)
 
     checksum = _zipChecksum(patch)
-    contents = _zipContents(patch)
+    contents = base64.b64encode(_zipContents(patch))
+
     sql = "INSERT INTO sync_server_version (create_uid, create_date, write_date, write_uid, date, state, importance, name, comment, sum, patch) VALUES (1, NOW(), NOW(), 1, NOW(),  'confirmed', 'required', '%s', 'Version %s installed by ufload', '%s', '%s')" % (v, v, checksum, contents)
-    rc = psql(args, sql, db)
+    # Write sql to a file
+    f = open('sql.sql', 'w')
+    f.write(sql)
+    f.close()
+
+    rc = psql_file(args, 'sql.sql', db)
+    os.remove('sql.sql');
+
     if rc != 0:
         return rc
     return 0
