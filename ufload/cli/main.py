@@ -426,7 +426,7 @@ def _syncLink(args, dbs, sdb):
         ufload.progress("No hardware id available, you will need to manually link your instances to %s." % sdb)
         return 0
 
-    if args.ss and args.sync is None:
+    if args.ss and (args.sync is None and args.synclight is None):
         #We don't update hardware id for all local instances: instances from another server could be already connected
         all = False
     else:
@@ -573,6 +573,10 @@ def parse():
     pUpgrade.add_argument("-patch", help="Path to the upgrade zip file")
     pUpgrade.add_argument("-version", help="Targeted version number")
     pUpgrade.add_argument("-ss", help="Instance name of the sync server (default = SYNC_SERVER_LOCAL)")
+    pUpgrade.add_argument("-load-sync-server", dest='sync', action='store_true',
+                          help="set up a local sync server and connects the restored instance(s) to it")
+    pUpgrade.add_argument("-load-sync-server-no-update", dest='synclight', action='store_true',
+                          help="set up a light local sync server and connects the restored instance(s) to it")
     pUpgrade.add_argument("-adminuser", default='admin', help="the admin username to log into the instances")
     pUpgrade.add_argument("-adminpw", default='admin', help="the admin password to log into the instances")
     pUpgrade.add_argument("-i", action="append", help="Instances to upgrade programmatically (matched as a substring, default = all). Other instances will be upgraded at login")
