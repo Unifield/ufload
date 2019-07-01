@@ -113,7 +113,7 @@ def _cmdRestore(args):
         # Restore a sync server (LIGHT WITH MASTER)
         rc = _syncRestore(args, dbs, ss)
 
-    if args.sync or args.synclight or args.autosync or args.ss:
+    if args.sync is not None or args.synclight is not None or args.autosync is not None or args.ss is not None:
         # Update instances sync settings
         for db in dbs:
             ufload._progress("Connection settings for %s" % db)
@@ -122,6 +122,8 @@ def _cmdRestore(args):
             if args.sync or args.autosync or args.synclight:
                 #Connects each instance to the sync server (and sets pwd)
                 ufload.db.connect_instance_to_sync_server(args, ss, db)
+
+        _syncLink(args, dbs, args.ss)
 
     return rc
 
@@ -353,7 +355,7 @@ def _multiRestore(args):
             except Exception as ex:
                 pass
 
-    if args.ss and args.sync is None:
+    if args.ss is not None and args.sync is None and args.synclight is None:
         _syncLink(args, dbs, args.ss)
 
     try:
@@ -417,6 +419,7 @@ def _syncRestore(args, dbs, ss):
 
 # separate function to make testing easier
 def _syncLink(args, dbs, sdb):
+    ufload.progress("Updating hardware id...")
     # Arrange that all instances use admin as the sync user
     ufload.db.sync_server_all_admin(args, sdb)
 
@@ -482,8 +485,40 @@ def _cmdClean(args):
     return 0
 
 def _cmdUpgrade(args):
+    if args.cloudpath is not None:
+        #Connect to OD (cloud access)
+        info = ufload.cloud.get_cloud_info(args)
+        ufload.progress('site=%s - path=%s - dir=%s' % (info.get('site'), info.get('path'), info.get('dir')))
+        dav = ufload.cloud.get_onedrive_connection(args)
+        #Check for a zip file in the folder
+        patches = ufload.cloud.list_patches(user=info.get('login'),
+                                            pw=info.get('password'),
+                                            where=info.get('dir'),
+                                            dav=dav,
+                                            url=info.get('url'),
+                                            site=info.get('site'),
+                                            path=info.get('path'))
+        if len(patches) == 0:
+            ufload.progress("No upgrade patch found.")
+            return 1
+
+        if len(patches) > 1:
+            ufload.progress("ufload cannot process more than one upgrade patch at a time. Please remove unwanted patches and leave only one zip file in the folder.")
+            return 1
+
+        #Download the patch
+        for j in patches:
+            filename = dav.download(j[2], j[1])
+
+        #Set patch and version args
+        args.patch = filename
+        m = re.search('/(.+?)\.patch\.zip/')
+        args.version = m.group
+
     if not _required(args, [ 'patch', 'version', 'adminuser', 'adminpw' ]):
         return 2
+
+
 
     #Install the patch on the sync server
     ss = 'SYNC_SERVER_LOCAL'
@@ -498,6 +533,7 @@ def _cmdUpgrade(args):
     else:
         instances = ufload.db._allDbs(args)
 
+    #Update hardware_id and entity names in the Sync Server
     _syncLink(args, instances, ss)
 
     #Update instances
@@ -582,6 +618,7 @@ def parse():
     pUpgrade.add_argument("-i", action="append", help="Instances to upgrade programmatically (matched as a substring, default = all). Other instances will be upgraded at login")
     pUpgrade.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization")
     pUpgrade.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade")
+    pUpgrade.add_argument("-patch-cloud-path", dest='patchcloud', help="Path to the folder containing the upgrade zip file on OneDrive")
     pUpgrade.set_defaults(func=_cmdUpgrade)
 
     pClean = sub.add_parser('clean', help="Clean DBs with a wrong name format")

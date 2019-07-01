@@ -327,11 +327,12 @@ def load_dump_into(args, db, f, sz):
 # into a non-production, non-live database. It:
 # 1. stomps all existing passwords
 # 2. changes the sync connection to a local one
-# 3. removes cron jobs for backups and sync
+# 3. removes cron jobs for backups and sync and automated imports/exports
+# 4. remove the automated imports/exports settings
 # 4. set the backup directory
 def delive(args, db):
     if args.live:
-        ufload.progress("*** WARNING: The restored database has LIVE passwords and LIVE syncing.")
+        ufload.progress("*** WARNING: The restored database has LIVE passwords and LIVE syncing and LIVE settings for automated imports/exports.")
         if args.sync:
             ufload.progress("(please note that ufload is not able to connect to the sync server using live passwords, please connect manually)")
         return 0
@@ -361,6 +362,23 @@ def delive(args, db):
     if rc != 0:
         return rc
     rc = psql(args, 'update ir_cron set active = \'f\' where model = \'stock.mission.report\';', db)
+    if rc != 0:
+        return rc
+
+    #Automated import jobs
+    rc = psql(args, 'update ir_cron set active = \'f\' where model = \'automated.import\';', db)
+    if rc != 0:
+        return rc
+    # Automated import settings
+    rc = psql(args, 'TRUNCATE automated_import;', db)
+    if rc != 0:
+        return rc
+    # Automated export jobs
+    rc = psql(args, 'update ir_cron set active = \'f\' where model = \'automated.export\';', db)
+    if rc != 0:
+        return rc
+    # Automated export settings
+    rc = psql(args, 'TRUNCATE automated_export;', db)
     if rc != 0:
         return rc
 
@@ -507,7 +525,7 @@ def _db_to_instance(args, db):
 def cleanDbs(args):
 
     import re
-    p = re.compile('^[A-Z0-9_]{8,}_[0-9]{8}_[0-9]{4}$')
+    p = re.compile('^[A-Z0-9_]{5,}_[0-9]{8}_[0-9]{4}$')
     ps = re.compile('SYNC')
 
     nb = 0

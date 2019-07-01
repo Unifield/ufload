@@ -59,9 +59,19 @@ def get_cloud_info(args):
     else:
         dir = ''    #No OC specified, let's use only the path
 
+    sub = args.cloud_path
+
+    try:
+        #if the argument patchcloud is set, we're downloading the upgrade patch, go to the right directory (MUST be under the main dir)
+        if (args.patchcloud is not None):
+            sub = sub + args.patchcloud
+    except:
+        #The argument cloudpath is not defined, forget about it (this is not the upgrade process)
+        pass
+
     ret = {
         'url': args.cloud_url,
-        'dir': dir + args.cloud_path,
+        'dir': dir + sub,
         'site': dir,
         'path': args.cloud_path,
         'login': args.user,
@@ -184,6 +194,21 @@ def list_files(**kwargs):
         if _match_any_wildcard(inst, i.lower()):
             ret[i] = all[i]
     return ret
+
+# list_files returns a dictionary of instances
+# and for each instance, a list of (path,file) tuples
+# in order from new to old.
+def list_patches(**kwargs):
+    directory = kwargs['where']
+
+    all = _get_all_files_and_timestamp(kwargs['dav'], directory)
+
+    ret = {}
+    for i in all:
+            ret[i] = all[i]
+    return ret
+
+
 
 def peek_inside_local_file(path, fn):
     try:
