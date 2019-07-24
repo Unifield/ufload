@@ -78,8 +78,8 @@ def mkpsql_file(args, file, db='postgres'):
     cmd = [ _find_exe('psql') ] + pg_common(args)
     cmd.append('-q')
     cmd.append('-t')
-    cmd.append('-c')
-    cmd.append('--file=%s' % file)
+    cmd.append('-f')
+    cmd.append(file)
     cmd.append(db)
     return cmd
 
@@ -411,7 +411,7 @@ def delive(args, db):
 
     if args.nopwreset:
         ufload.progress("*** WARNING: The restored database has LIVE passwords.")
-	return 0
+    return 0
 
     # set the username of the admin account
     rc = psql(args, 'update res_users set login = \'%s\' where id = 1;' % adminuser, db)
@@ -587,7 +587,7 @@ def _allDbs(args):
     else:
         v = _run_out(args, mkpsql(args, 'select datname from pg_database where datistemplate = false and datname != \'postgres\''))
         
-    return map(lambda x: x.strip(), filter(len, v))
+    return filter(len, map(lambda x: x.strip(), v))
 
 def exists(args, db):
     v = _run_out(args, mkpsql(args, 'select datname from pg_database where datname = \'%s\'' % db))
@@ -639,6 +639,35 @@ def connect_instance_to_sync_server(args, sync_server, db):
     conn_manager.connect()
     #netrpc.get('sync.client.entity').sync()
 
+def manual_sync(args, sync_server, db):
+    if db.startswith('SYNC_SERVER'):
+        return 0
+    ufload.progress("manual sync instance %s to sync server %s" % (db, sync_server))
+    netrpc = connect_rpc(args, sync_server, db)
+    sync_obj = netrpc.get('sync.client.sync_manager')
+
+    sync_ids = sync_obj.search([])
+    sync_obj.sync(sync_ids)
+
+def manual_upgrade(args, sync_server, db):
+    if db.startswith('SYNC_SERVER'):
+        return 0
+    ufload.progress("manual update instance %s to sync server %s" % (db, sync_server))
+    netrpc = connect_rpc(args, sync_server, db)
+    sync_obj = netrpc.get('sync_client.upgrade')
+    
+    ufload.progress("Download patch")
+    sync_ids = sync_obj.search([])
+    result = sync_obj.download(sync_ids)
+    if result:
+        ufload.progress("update Unifield")
+        result = sync_obj.do_upgrade(sync_ids)
+    return result
+    
+def connect_rpc(args, sync_server, db):
+    netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=8069, timeout=1000, version='6.0')
+    netrpc.login(args.adminuser.lower(), args.adminpw, database=db)
+    return netrpc
 
 def _parse_dsn(dsn):
     res = {}
@@ -733,20 +762,28 @@ def installPatch(args, db='SYNC_SERVER_LOCAL'):
     patch = os.path.normpath(args.patch)
 
     checksum = _zipChecksum(patch)
-    contents = base64.b64encode(_zipContents(patch))
 
-    sql = "INSERT INTO sync_server_version (create_uid, create_date, write_date, write_uid, date, state, importance, name, comment, sum, patch) VALUES (1, NOW(), NOW(), 1, NOW(),  'confirmed', 'required', '%s', 'Version %s installed by ufload', '%s', '%s')" % (v, v, checksum, contents)
-    # Write sql to a file
-    f = open('sql.sql', 'w')
-    f.write(sql)
-    f.close()
+    rc, out = psql(args, "SELECT 1 FROM sync_server_version WHERE sum ='{}';".format(checksum), db, True)
+    if not out.strip() and rc == 0:
+        contents = base64.b64encode(_zipContents(patch))     
 
-    rc = psql_file(args, 'sql.sql', db)
-    os.remove('sql.sql');
+        sql = "INSERT INTO sync_server_version (create_uid, create_date, write_date, write_uid, date, state, importance, name, comment, sum, patch) VALUES (1, NOW(), NOW(), 1, NOW(),  'confirmed', 'required', '%s', 'Version %s installed by ufload', '%s', '%s')" % (v, v, checksum, contents)
+        # ufload.progress(sql)
+        # Write sql to a file
+        f = open('sql.sql', 'w')
+        f.write(sql)
+        f.close()
 
-    if rc != 0:
-        return rc
-    return 0
+        rc = psql_file(args, 'sql.sql', db)
+        os.remove('sql.sql');
+
+        if rc != 0:
+            return rc
+        return 0
+    else:
+        ufload.progress("The v.%s patch on %s database is already installed!!" % (v, db))
+        return -1
+        
 
 def updateInstance(inst):
     #Call the do_login url in order to trigger the sync (should work even with wrong credentials)

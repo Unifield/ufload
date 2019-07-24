@@ -203,10 +203,7 @@ def list_patches(**kwargs):
 
     all = _get_all_files_and_timestamp(kwargs['dav'], directory)
 
-    ret = {}
-    for i in all:
-            ret[i] = all[i]
-    return ret
+    return all
 
 
 

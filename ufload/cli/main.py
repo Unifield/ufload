@@ -5,6 +5,7 @@ import subprocess
 import shutil
 import time
 import re
+import socket
 
 import ufload
 
@@ -485,7 +486,7 @@ def _cmdClean(args):
     return 0
 
 def _cmdUpgrade(args):
-    if args.cloudpath is not None:
+    if args.patchcloud is not None:
         #Connect to OD (cloud access)
         info = ufload.cloud.get_cloud_info(args)
         ufload.progress('site=%s - path=%s - dir=%s' % (info.get('site'), info.get('path'), info.get('dir')))
@@ -512,8 +513,9 @@ def _cmdUpgrade(args):
 
         #Set patch and version args
         args.patch = filename
-        m = re.search('/(.+?)\.patch\.zip/')
-        args.version = m.group
+        m = re.search('(.+?)\.patch\.zip', filename)
+        if m:
+            args.version = m.group(1)
 
     if not _required(args, [ 'patch', 'version', 'adminuser', 'adminpw' ]):
         return 2
@@ -524,7 +526,9 @@ def _cmdUpgrade(args):
     ss = 'SYNC_SERVER_LOCAL'
     if args.ss:
         ss = args.ss
-    ufload.db.installPatch(args, ss)
+    if ufload.db.installPatch(args, ss) == -1:
+        ufload.progress("No new patches found")
+        return 0
 
     #List instances
     inst = []
@@ -535,21 +539,142 @@ def _cmdUpgrade(args):
 
     #Update hardware_id and entity names in the Sync Server
     _syncLink(args, instances, ss)
+        
 
-    #Update instances
+    update_src = True
+    update_available = False
+    
+    #Upgrade Unifield
     for instance in instances:
-        ufload._progress("Connecting instance %s to sync server %s" % (instance, ss))
-        ufload.db.connect_instance_to_sync_server(args, ss, instance)
-        #ufload._progress("Update instance %s" % instance)
-        #ufload.db.updateInstance(instance)
-        if args.autosync:
-            #activate auto-sync (now + 1 hour)
-            ufload.db.activate_autosync(args, instance, ss)
-        if args.silentupgrade:
-            #activate silent upgrade
-            ufload.db.activate_silentupgrade(args, instance)
+        if instance and instance != ss:
+            ufload._progress("Connecting instance %s to sync server %s" % (instance, ss))
+            try:
+                ufload.db.connect_instance_to_sync_server(args, ss, instance)
+            except oerplib.error.RPCError as err:
+                ufload._progress("error.RPCError: {0}".format(err[0]))
+                if err[0].endswith("OpenERP version doesn't match database version!"):
+                    ufload.progress("new versions is present")
+                    update_available = True
+                else:
+                    raise oerplib.error.RPCError(err)
+            
+            
+            i = 0
+            while update_src:
+                try:
+                    ufload.db.manual_sync(args, ss, instance)
+                except oerplib.error.RPCError as err:
+                    ufload.progress("error.RPCError: {0}".format(err[0]))
+                    regex = r""".*Cannot check for updates: There is/are [0-9]+ revision\(s\) available."""
+                    flags = re.S
+                    if re.compile(regex, flags).match(err[0]):
+                        update_available = True
+                        break
+                    elif err[0].endswith('Authentification Failed, please contact the support'):
+                        if i >= 10:
+                            raise oerplib.error.RPCError(err)
+                        time.sleep(1)
+                        i += 1
+                    else:
+                        raise oerplib.error.RPCError(err)
+                update_src = False
+                break
+            if not update_src:
+                ufload.progress("No valid Update valid.")
+                break
+                    
+            if update_available:
+                ufload.progress("Upgrading Unifield App")
+                ufload.db.manual_upgrade(args, ss, instance)
+                ufload.progress("Awaiting the restart of Unifield")
+                starting_up = True
+                i = 0
+                sleep_time = 1
+                max_time = 300
+                max_incrementation = (max_time/sleep_time)
+                sys.stdout.flush()
+                while starting_up and i < max_incrementation:
+                    sys.stdout.write(next(spinner))
+                    sys.stdout.flush()
+                    time.sleep(sleep_time)
+                    starting_up = True
+                    i += 1
+                    try:
+                        r = requests.get("http://127.0.0.1:8061/openerp/login?db=&user=")
+                        r.raise_for_status()
+                    except requests.exceptions.ConnectionError:
+                        starting_up = False
+                    except requests.exceptions.HTTPError as http_err:
+                        pass
+                    sys.stdout.write('\b')
+                sys.stdout.write('\r')    
+                if i >= max_incrementation and not starting_up:
+                    raise ValueError('The UniField serveur can not be restarted!!')
+                    
+                break
+    
+    #Update instances            
+    if args.migratedb and update_src:            
+        for instance in instances:
+            update_modules = True
+            i = 0
+            sleep_time = 5
+            max_time = 1800
+            max_incrementation = (max_time/sleep_time)
+            ufload.progress("Updating modules for instance {}".format(instance))
+            while update_modules and i < max_incrementation:
+                update_modules = False
+                try:
+                    netrpc = ufload.db.connect_rpc(args, ss, instance)
+                    # pprint(netrpc)
+                except oerplib.error.RPCError as err:
+                    # pprint(err[0])
+                    ufload._progress("error.RPCError: {0}".format(err[0]))
+                    # regex = r""".*Cannot check for updates: There is/are [0-9]+ revision\(s\) available."""
+                    # flags = re.S
+                    # if re.compile(regex, flags).match(err[0]) or err[0].endswith('Server is updating modules ...'):
+                        # update_modules = True
+                    # elif err[0].endswith('ServerUpdate: Server is updating modules ...'):
+                    if err[0].endswith('ServerUpdate: Server is updating modules ...'):
+                        update_modules = True
+                    else:
+                        raise oerplib.error.RPCError(err)
+                except socket.error as err:
+                    # pprint(err)
+                    update_modules = True
+                for j in range(sleep_time):
+                    sys.stdout.write(next(spinner))
+                    sys.stdout.flush()
+                    time.sleep(1) 
+                    sys.stdout.write('\b')
+                i +=1
+            sys.stdout.write('\r') 
+            if i >= max_incrementation and not update_modules:
+                raise ValueError("tolong wait for updating module instance %s".format(instance))        
+            
+    if (args.autosync or  args.silentupgrade) and update_src:
+        for instance in instances:
+            if instance:
+                ufload._progress("Connecting instance %s to sync server %s" % (instance, ss))
+                ufload.db.connect_instance_to_sync_server(args, ss, instance)
+                #ufload._progress("Update instance %s" % instance)
+                #ufload.db.updateInstance(instance)
+                if args.autosync:
+                    #activate auto-sync (now + 1 hour)
+                    ufload.db.activate_autosync(args, instance, ss)
+                if args.silentupgrade:
+                    #activate silent upgrade
+                    ufload.db.activate_silentupgrade(args, instance)
 
     return 0
+
+def spinning_cursor():
+    while True:
+        for cursor in '|/-\\':
+            yield cursor
+
+spinner = spinning_cursor()
+
 
 def parse():
     parser = argparse.ArgumentParser(prog='ufload')
@@ -619,6 +744,7 @@ def parse():
     pUpgrade.add_argument("-auto-sync", dest="autosync", action="store_true", help="Activate automatic synchronization")
     pUpgrade.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade")
     pUpgrade.add_argument("-patch-cloud-path", dest='patchcloud', help="Path to the folder containing the upgrade zip file on OneDrive")
+    pUpgrade.add_argument("-migrate-db", dest='migratedb', action="store_true", help="Path to the folder containing the upgrade zip file on OneDrive")
     pUpgrade.set_defaults(func=_cmdUpgrade)
 
     pClean = sub.add_parser('clean', help="Clean DBs with a wrong name format")
