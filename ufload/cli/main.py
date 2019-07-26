@@ -486,14 +486,7 @@ def _cmdClean(args):
     return 0
 
 def _cmdUpgrade(args):
-    #Install the patch on the sync server
-    ss = 'SYNC_SERVER_LOCAL'
-    if args.ss:
-        ss = args.ss
-        
-    if args.patchcloud is not None: 
-        if not _required(args, [ 'adminuser', 'adminpw' ]):
-            return 2           
+    if args.patchcloud is not None:
         #Connect to OD (cloud access)
         info = ufload.cloud.get_cloud_info(args)
         ufload.progress('site=%s - path=%s - dir=%s' % (info.get('site'), info.get('path'), info.get('dir')))
@@ -510,32 +503,32 @@ def _cmdUpgrade(args):
             ufload.progress("No upgrade patch found.")
             return 1
 
+        if len(patches) > 1:
+            ufload.progress("ufload cannot process more than one upgrade patch at a time. Please remove unwanted patches and leave only one zip file in the folder.")
+            return 1
+
         #Download the patch
-        patches.sort(key=lambda s: map(int, re.split('\.|-|p',re.search('uf(.+?)\.patch\.zip',  s[1], re.I).group(1))))
-        i = 0
         for j in patches:
             filename = dav.download(j[2], j[1])
 
-            #Set patch and version args
-            args.patch = filename
-            m = re.search('(.+?)\.patch\.zip', filename)
-            if m:
-                args.version = m.group(1)
-                
-            if ufload.db.installPatch(args, ss) == 0:
-                i += 1
-            os.remove(filename)
-        if i == 0:
-            ufload.progress("No new patches found")
-            return 0
-    else:
-        
-        if not _required(args, [ 'patch', 'version', 'adminuser', 'adminpw' ]):
-            return 2
-    
-        if ufload.db.installPatch(args, ss) == -1:
-            ufload.progress("No new patches found")
-            return 0
+        #Set patch and version args
+        args.patch = filename
+        m = re.search('(.+?)\.patch\.zip', filename)
+        if m:
+            args.version = m.group(1)
+
+    if not _required(args, [ 'patch', 'version', 'adminuser', 'adminpw' ]):
+        return 2
+
+
+
+    #Install the patch on the sync server
+    ss = 'SYNC_SERVER_LOCAL'
+    if args.ss:
+        ss = args.ss
+    if ufload.db.installPatch(args, ss) == -1:
+        ufload.progress("No new patches found")
+        return 0
 
     #List instances
     inst = []
@@ -558,6 +551,7 @@ def _cmdUpgrade(args):
             try:
                 ufload.db.connect_instance_to_sync_server(args, ss, instance)
             except oerplib.error.RPCError as err:
+                ufload._progress("error.RPCError: {0}".format(err[0]))
                 if err[0].endswith("OpenERP version doesn't match database version!"):
                     ufload.progress("new versions is present")
                     update_available = True
@@ -570,6 +564,7 @@ def _cmdUpgrade(args):
                 try:
                     ufload.db.manual_sync(args, ss, instance)
                 except oerplib.error.RPCError as err:
+                    ufload.progress("error.RPCError: {0}".format(err[0]))
                     regex = r""".*Cannot check for updates: There is/are [0-9]+ revision\(s\) available."""
                     flags = re.S
                     if re.compile(regex, flags).match(err[0]):
