@@ -795,16 +795,13 @@ def installUserRights(args, db='SYNC_SERVER_LOCAL'):
     f.close()
     # ur_name = args.user_rights_zip.split('.')[0]
     ur_name, ur_name_extension = os.path.splitext(args.user_rights_zip)
-    pprint(ur_name)
     context= {'run_foreground': True}
     netrpc = connect_rpc(args, db)
     
     sync_obj = netrpc.get('sync_server.user_rights.add_file')
     # netrpc.config['run_foreground'] = True
-    # pprint(sync_obj.config())
     ufload.progress("Download User Rights")
     sync_ids = sync_obj.search([])
-    # pprint(sync_obj)
     # result = sync_obj.import_zip(sync_ids, {'name': ur_name, 'zip_file': encodestring(plain_zip)})
 
     load_id = sync_obj.create( {'name': ur_name, 'zip_file': encodestring(plain_zip)})
