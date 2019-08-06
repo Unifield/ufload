@@ -1,5 +1,6 @@
 import os, sys, subprocess, tempfile, hashlib, urllib, oerplib, zipfile, base64
 import ufload
+from base64 import encodestring
 
 def _run_out(args, cmd):
     try:
@@ -643,7 +644,7 @@ def manual_sync(args, sync_server, db):
     if db.startswith('SYNC_SERVER'):
         return 0
     ufload.progress("manual sync instance %s to sync server %s" % (db, sync_server))
-    netrpc = connect_rpc(args, sync_server, db)
+    netrpc = connect_rpc(args, db)
     sync_obj = netrpc.get('sync.client.sync_manager')
 
     sync_ids = sync_obj.search([])
@@ -653,7 +654,7 @@ def manual_upgrade(args, sync_server, db):
     if db.startswith('SYNC_SERVER'):
         return 0
     ufload.progress("manual update instance %s to sync server %s" % (db, sync_server))
-    netrpc = connect_rpc(args, sync_server, db)
+    netrpc = connect_rpc(args, db)
     sync_obj = netrpc.get('sync_client.upgrade')
     
     ufload.progress("Download patch")
@@ -664,7 +665,7 @@ def manual_upgrade(args, sync_server, db):
         result = sync_obj.do_upgrade(sync_ids)
     return result
     
-def connect_rpc(args, sync_server, db):
+def connect_rpc(args, db):
     netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=8069, timeout=1000, version='6.0')
     netrpc.login(args.adminuser.lower(), args.adminpw, database=db)
     return netrpc
@@ -783,6 +784,45 @@ def installPatch(args, db='SYNC_SERVER_LOCAL'):
     else:
         ufload.progress("The v.%s patch on %s database is already installed!!" % (v, db))
         return -1
+        
+def installUserRights(args, db='SYNC_SERVER_LOCAL'):
+    ufload.progress('Install user rights : {}'.format(args.user_rights_zip))
+    if not args.user_rights_zip or not os.path.isfile(args.user_rights_zip):
+        raise ValueError('The file {} not exist'.format(args.user_rights_zip))
+        
+    f = open(args.user_rights_zip, 'rb')
+    plain_zip = f.read()
+    f.close()
+    # ur_name = args.user_rights_zip.split('.')[0]
+    ur_name, ur_name_extension = os.path.splitext(args.user_rights_zip)
+    pprint(ur_name)
+    context= {'run_foreground': True}
+    netrpc = connect_rpc(args, db)
+    
+    sync_obj = netrpc.get('sync_server.user_rights.add_file')
+    # netrpc.config['run_foreground'] = True
+    # pprint(sync_obj.config())
+    ufload.progress("Download User Rights")
+    sync_ids = sync_obj.search([])
+    # pprint(sync_obj)
+    # result = sync_obj.import_zip(sync_ids, {'name': ur_name, 'zip_file': encodestring(plain_zip)})
+
+    load_id = sync_obj.create( {'name': ur_name, 'zip_file': encodestring(plain_zip)})
+    result = sync_obj.import_zip( [load_id], context)
+    result = sync_obj.read( load_id, ['state', 'message'])
+    if result['state'] != 'done':
+        ufload.progress('Unable to load UR: %s' % result['message'])
+        raise oerplib.error.RPCErro(result['message'])
+    else:
+        result = sync_obj.done( [load_id])
+        ufload.progress('New UR file loaded')
+        return result
+
+    # loader = self.pool.get('sync_server.user_rights.add_file')
+    # load_id = loader.create(cr, uid, {'name': ur_name, 'zip_file': encodestring(plain_zip)}, context=context)
+    # loader.import_zip(cr, uid, [load_id], context=context)
+
+    return result
         
 
 def updateInstance(inst):
