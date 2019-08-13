@@ -371,16 +371,17 @@ def delive(args, db):
         return rc
     # Automated import settings
     rc = psql(args, 'UPDATE automated_import SET report_path=\'\', src_path=\'\', ftp_url=\'\', dest_path=\'\', ftp_ok=\'f\', ftp_port=\'\',dest_path_failure=\'\', ftp_login=\'\', ftp_password=\'\', ftp_protocol=\'\';', db)
-    if rc != 0:
-        return rc
+    #if rc != 0:
+    #    return rc
+
     # Automated export jobs
     rc = psql(args, 'update ir_cron set active = \'f\' where model = \'automated.export\';', db)
     if rc != 0:
         return rc
     # Automated export settings
     rc = psql(args, 'UPDATE automated_export SET report_path=\'\', ftp_url=\'\', dest_path=\'\', ftp_ok=\'f\', ftp_port=\'\',dest_path_failure=\'\', ftp_login=\'\', ftp_password=\'\', ftp_protocol=\'\';', db)
-    if rc != 0:
-        return rc
+    #if rc != 0:
+    #    return rc
 
     # Now we check for arguments allowing auto-sync and silent-upgrade
     if args.autosync:
