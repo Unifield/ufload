@@ -48,7 +48,7 @@ def instance_to_dir(instance):
 
     return ''
 
-def get_cloud_info(args):
+def get_cloud_info(args, sub_dir=''):
 
     #Cloud password is encrypted
     pword = _decrypt(args.pw)
@@ -63,8 +63,8 @@ def get_cloud_info(args):
 
     try:
         #if the argument patchcloud is set, we're downloading the upgrade patch, go to the right directory (MUST be under the main dir)
-        if (args.patchcloud is not None):
-            sub = sub + args.patchcloud
+        if (sub_dir is not None):
+            sub = sub + sub_dir
     except:
         #The argument cloudpath is not defined, forget about it (this is not the upgrade process)
         pass
@@ -203,10 +203,7 @@ def list_patches(**kwargs):
 
     all = _get_all_files_and_timestamp(kwargs['dav'], directory)
 
-    ret = {}
-    for i in all:
-            ret[i] = all[i]
-    return ret
+    return all
 
 
 

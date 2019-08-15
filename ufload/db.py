@@ -1,5 +1,6 @@
 import os, sys, subprocess, tempfile, hashlib, urllib, oerplib, zipfile, base64
 import ufload
+from base64 import encodestring
 
 def _run_out(args, cmd):
     try:
@@ -78,8 +79,8 @@ def mkpsql_file(args, file, db='postgres'):
     cmd = [ _find_exe('psql') ] + pg_common(args)
     cmd.append('-q')
     cmd.append('-t')
-    cmd.append('-c')
-    cmd.append('--file=%s' % file)
+    cmd.append('-f')
+    cmd.append(file)
     cmd.append(db)
     return cmd
 
@@ -412,7 +413,7 @@ def delive(args, db):
 
     if args.nopwreset:
         ufload.progress("*** WARNING: The restored database has LIVE passwords.")
-	return 0
+    return 0
 
     # set the username of the admin account
     rc = psql(args, 'update res_users set login = \'%s\' where id = 1;' % adminuser, db)
@@ -588,7 +589,7 @@ def _allDbs(args):
     else:
         v = _run_out(args, mkpsql(args, 'select datname from pg_database where datistemplate = false and datname != \'postgres\''))
         
-    return map(lambda x: x.strip(), filter(len, v))
+    return filter(len, map(lambda x: x.strip(), v))
 
 def exists(args, db):
     v = _run_out(args, mkpsql(args, 'select datname from pg_database where datname = \'%s\'' % db))
@@ -640,6 +641,35 @@ def connect_instance_to_sync_server(args, sync_server, db):
     conn_manager.connect()
     #netrpc.get('sync.client.entity').sync()
 
+def manual_sync(args, sync_server, db):
+    if db.startswith('SYNC_SERVER'):
+        return 0
+    ufload.progress("manual sync instance %s to sync server %s" % (db, sync_server))
+    netrpc = connect_rpc(args, db)
+    sync_obj = netrpc.get('sync.client.sync_manager')
+
+    sync_ids = sync_obj.search([])
+    sync_obj.sync(sync_ids)
+
+def manual_upgrade(args, sync_server, db):
+    if db.startswith('SYNC_SERVER'):
+        return 0
+    ufload.progress("manual update instance %s to sync server %s" % (db, sync_server))
+    netrpc = connect_rpc(args, db)
+    sync_obj = netrpc.get('sync_client.upgrade')
+    
+    ufload.progress("Download patch")
+    sync_ids = sync_obj.search([])
+    result = sync_obj.download(sync_ids)
+    if result:
+        ufload.progress("update Unifield")
+        result = sync_obj.do_upgrade(sync_ids)
+    return result
+    
+def connect_rpc(args, db):
+    netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=8069, timeout=1000, version='6.0')
+    netrpc.login(args.adminuser.lower(), args.adminpw, database=db)
+    return netrpc
 
 def _parse_dsn(dsn):
     res = {}
@@ -734,20 +764,64 @@ def installPatch(args, db='SYNC_SERVER_LOCAL'):
     patch = os.path.normpath(args.patch)
 
     checksum = _zipChecksum(patch)
-    contents = base64.b64encode(_zipContents(patch))
 
-    sql = "INSERT INTO sync_server_version (create_uid, create_date, write_date, write_uid, date, state, importance, name, comment, sum, patch) VALUES (1, NOW(), NOW(), 1, NOW(),  'confirmed', 'required', '%s', 'Version %s installed by ufload', '%s', '%s')" % (v, v, checksum, contents)
-    # Write sql to a file
-    f = open('sql.sql', 'w')
-    f.write(sql)
+    rc, out = psql(args, "SELECT 1 FROM sync_server_version WHERE sum ='{}';".format(checksum), db, True)
+    if not out.strip() and rc == 0:
+        contents = base64.b64encode(_zipContents(patch))     
+
+        sql = "INSERT INTO sync_server_version (create_uid, create_date, write_date, write_uid, date, state, importance, name, comment, sum, patch) VALUES (1, NOW(), NOW(), 1, NOW(),  'confirmed', 'required', '%s', 'Version %s installed by ufload', '%s', '%s')" % (v, v, checksum, contents)
+        # ufload.progress(sql)
+        # Write sql to a file
+        f = open('sql.sql', 'w')
+        f.write(sql)
+        f.close()
+
+        rc = psql_file(args, 'sql.sql', db)
+        os.remove('sql.sql');
+
+        if rc != 0:
+            return rc
+        return 0
+    else:
+        ufload.progress("The v.%s patch on %s database is already installed!!" % (v, db))
+        return -1
+        
+def installUserRights(args, db='SYNC_SERVER_LOCAL'):
+    ufload.progress('Install user rights : {}'.format(args.user_rights_zip))
+    if not args.user_rights_zip or not os.path.isfile(args.user_rights_zip):
+        raise ValueError('The file {} not exist'.format(args.user_rights_zip))
+        
+    f = open(args.user_rights_zip, 'rb')
+    plain_zip = f.read()
     f.close()
+    # ur_name = args.user_rights_zip.split('.')[0]
+    ur_name, ur_name_extension = os.path.splitext(args.user_rights_zip)
+    context= {'run_foreground': True}
+    netrpc = connect_rpc(args, db)
+    
+    sync_obj = netrpc.get('sync_server.user_rights.add_file')
+    # netrpc.config['run_foreground'] = True
+    ufload.progress("Download User Rights")
+    sync_ids = sync_obj.search([])
+    # result = sync_obj.import_zip(sync_ids, {'name': ur_name, 'zip_file': encodestring(plain_zip)})
 
-    rc = psql_file(args, 'sql.sql', db)
-    os.remove('sql.sql');
+    load_id = sync_obj.create( {'name': ur_name, 'zip_file': encodestring(plain_zip)})
+    result = sync_obj.import_zip( [load_id], context)
+    result = sync_obj.read( load_id, ['state', 'message'])
+    if result['state'] != 'done':
+        ufload.progress('Unable to load UR: %s' % result['message'])
+        raise oerplib.error.RPCErro(result['message'])
+    else:
+        result = sync_obj.done( [load_id])
+        ufload.progress('New UR file loaded')
+        return result
 
-    if rc != 0:
-        return rc
-    return 0
+    # loader = self.pool.get('sync_server.user_rights.add_file')
+    # load_id = loader.create(cr, uid, {'name': ur_name, 'zip_file': encodestring(plain_zip)}, context=context)
+    # loader.import_zip(cr, uid, [load_id], context=context)
+
+    return result
+        
 
 def updateInstance(inst):
     #Call the do_login url in order to trigger the sync (should work even with wrong credentials)
