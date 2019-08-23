@@ -124,7 +124,7 @@ def _cmdRestore(args):
                 #Connects each instance to the sync server (and sets pwd)
                 ufload.db.connect_instance_to_sync_server(args, ss, db)
 
-        _syncLink(args, dbs, args.ss)
+        _syncLink(args, dbs, ss)
 
     return rc
 

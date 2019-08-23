@@ -394,6 +394,7 @@ def delive(args, db):
         if rc != 0:
             return rc
         rc = psql(args, 'update sync_client_sync_server_connection SET host = \'127.0.0.1\', database = \'%s\';' % ss, db)
+
     if args.silentupgrade:
         if not args.autosync:
             ufload.progress("*** WARNING: Silent upgrade is enabled, but auto sync is not.")
@@ -413,7 +414,7 @@ def delive(args, db):
 
     if args.nopwreset:
         ufload.progress("*** WARNING: The restored database has LIVE passwords.")
-    return 0
+        return 0
 
     # set the username of the admin account
     rc = psql(args, 'update res_users set login = \'%s\' where id = 1;' % adminuser, db)
@@ -621,7 +622,7 @@ def sync_server_all_admin(args, db='SYNC_SERVER_LOCAL'):
     _run_out(args, mkpsql(args, 'update sync_server_entity set user_id = 1;', db))
 
 def sync_server_settings(args, sync_server, db):
-    _run_out(args, mkpsql(args, 'update sync_client_sync_server_connection set database = \'%s\', login=\'%s\' user_id = 1;' % (sync_server, args.adminuser.lower()) , db))
+    _run_out(args, mkpsql(args, 'update sync_client_sync_server_connection set database = \'%s\', login=\'%s\', user_id = 1;' % (sync_server, args.adminuser.lower()) , db))
 
 def connect_instance_to_sync_server(args, sync_server, db):
     #Temporary desactivation of auto-connect
@@ -657,7 +658,7 @@ def manual_upgrade(args, sync_server, db):
     ufload.progress("manual update instance %s to sync server %s" % (db, sync_server))
     netrpc = connect_rpc(args, db)
     sync_obj = netrpc.get('sync_client.upgrade')
-    
+
     ufload.progress("Download patch")
     sync_ids = sync_obj.search([])
     result = sync_obj.download(sync_ids)
@@ -665,7 +666,7 @@ def manual_upgrade(args, sync_server, db):
         ufload.progress("update Unifield")
         result = sync_obj.do_upgrade(sync_ids)
     return result
-    
+
 def connect_rpc(args, db):
     netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=8069, timeout=1000, version='6.0')
     netrpc.login(args.adminuser.lower(), args.adminpw, database=db)
@@ -767,7 +768,7 @@ def installPatch(args, db='SYNC_SERVER_LOCAL'):
 
     rc, out = psql(args, "SELECT 1 FROM sync_server_version WHERE sum ='{}';".format(checksum), db, True)
     if not out.strip() and rc == 0:
-        contents = base64.b64encode(_zipContents(patch))     
+        contents = base64.b64encode(_zipContents(patch))
 
         sql = "INSERT INTO sync_server_version (create_uid, create_date, write_date, write_uid, date, state, importance, name, comment, sum, patch) VALUES (1, NOW(), NOW(), 1, NOW(),  'confirmed', 'required', '%s', 'Version %s installed by ufload', '%s', '%s')" % (v, v, checksum, contents)
         # ufload.progress(sql)
@@ -785,12 +786,12 @@ def installPatch(args, db='SYNC_SERVER_LOCAL'):
     else:
         ufload.progress("The v.%s patch on %s database is already installed!!" % (v, db))
         return -1
-        
+
 def installUserRights(args, db='SYNC_SERVER_LOCAL'):
     ufload.progress('Install user rights : {}'.format(args.user_rights_zip))
     if not args.user_rights_zip or not os.path.isfile(args.user_rights_zip):
         raise ValueError('The file {} not exist'.format(args.user_rights_zip))
-        
+
     f = open(args.user_rights_zip, 'rb')
     plain_zip = f.read()
     f.close()
@@ -798,7 +799,7 @@ def installUserRights(args, db='SYNC_SERVER_LOCAL'):
     ur_name, ur_name_extension = os.path.splitext(args.user_rights_zip)
     context= {'run_foreground': True}
     netrpc = connect_rpc(args, db)
-    
+
     sync_obj = netrpc.get('sync_server.user_rights.add_file')
     # netrpc.config['run_foreground'] = True
     ufload.progress("Download User Rights")
@@ -821,7 +822,7 @@ def installUserRights(args, db='SYNC_SERVER_LOCAL'):
     # loader.import_zip(cr, uid, [load_id], context=context)
 
     return result
-        
+
 
 def updateInstance(inst):
     #Call the do_login url in order to trigger the sync (should work even with wrong credentials)
