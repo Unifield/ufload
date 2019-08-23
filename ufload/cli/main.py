@@ -107,7 +107,7 @@ def _cmdRestore(args):
         return rc
 
     ss = 'SYNC_SERVER_LOCAL'
-    if args.ss:
+    if args.ss is not None:
         ss = args.ss
 
     if args.sync or args.synclight:
