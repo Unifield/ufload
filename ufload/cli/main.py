@@ -850,7 +850,7 @@ def main():
         except KeyboardInterrupt:
             rc = 1
 
-    ufload.progress("ufload is done working :)")
+    ufload.progress("ufload is done working :-)")
 
     if args.remote:
         import socket
