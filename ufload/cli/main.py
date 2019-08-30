@@ -114,13 +114,13 @@ def _cmdRestore(args):
         # Restore a sync server (LIGHT WITH MASTER)
         rc = _syncRestore(args, dbs, ss)
 
-    if args.sync is not None or args.synclight is not None or args.autosync is not None or args.ss is not None:
+    if args.sync or args.synclight or args.autosync or args.ss is not None:
         # Update instances sync settings
         for db in dbs:
             ufload._progress("Connection settings for %s" % db)
             #Defines sync server connection settings on each instance
             ufload.db.sync_server_settings(args, ss, db)
-            if args.sync or args.autosync or args.synclight:
+            if args.sync or args.autosync or args.synclight or args.ss is not None:
                 #Connects each instance to the sync server (and sets pwd)
                 ufload.db.connect_instance_to_sync_server(args, ss, db)
 

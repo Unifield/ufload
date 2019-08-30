@@ -499,7 +499,8 @@ def get_hwid(args):
                 hwid, regtype = _winreg.QueryValueEx(registry_key, "HardwareId")
                 ufload.progress("Hardware id from registry key: %s" % hwid)
                 return hwid
-        except WindowsError:
+        except WindowsError as e:
+            ufload._progress(e.message)
             return None
     else:
         # Follow the same algorithm that Unifield uses (see sync_client.py)
@@ -628,8 +629,8 @@ def connect_instance_to_sync_server(args, sync_server, db):
     #Temporary desactivation of auto-connect
     #return 0
 
-    if db.startswith('SYNC_SERVER'):
-        return 0
+    # if db.startswith('SYNC_SERVER'):
+    #    return 0
 
     #oerp = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=12173, version='6.0')
     ufload.progress('Connecting instance %s to %s' % (db, sync_server))

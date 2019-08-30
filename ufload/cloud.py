@@ -106,7 +106,7 @@ def get_onedrive_connection(args):
 
 
 def _get_all_files_and_timestamp(dav, d):
-    ufload.progress('Listing files from dir %s' % d)
+    ufload.progress('Browsing files from dir %s' % d)
     try:
         #all_zip = dav.ls(d)
         all_zip = dav.list(d)
@@ -130,7 +130,7 @@ def _get_all_files_and_timestamp(dav, d):
         if abs(time.time() - time.mktime(t)) < 900:
             continue
 
-        ufload.progress('File found: %s' % f['Name'])
+        # ufload.progress('File found: %s' % f['Name'])
 
         if f['Name'].split(".")[-1] != "zip":
             logging.warn("Ignoring non-zipfile: %s" % f['Name'])
