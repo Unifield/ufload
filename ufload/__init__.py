@@ -2,7 +2,7 @@ import cloud; assert cloud
 import db; assert db
 import httpfile; assert httpfile
 
-__version__ = '0.258'
+__version__ = '0.260'
 
 # null progress, can be overridden by importers
 def _progress(p):

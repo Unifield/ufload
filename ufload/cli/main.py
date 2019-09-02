@@ -93,8 +93,9 @@ def _cmdRestore(args):
 
     if args.autosync is not None:
         if not _required(args, [ 'sync' ]):
-            ufload.progress("Load sync server (-load-sync-server) argument is mandatory for auto-sync")
-            return 2
+            if not _required(args, [ 'synclight' ]):
+                ufload.progress("Load sync server (-load-sync-server or -load-sync-server-no-update) argument is mandatory for auto-sync")
+                return 2
 
     if args.file is not None:
         rc, dbs = _fileRestore(args)
