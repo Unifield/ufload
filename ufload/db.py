@@ -343,12 +343,16 @@ def delive(args, db):
     if args.sync_xmlrpcport:
         port = int(args.sync_xmlrpcport)
 
+    ss = 'SYNC_SERVER_LOCAL'
+    if args.ss:
+        ss = args.ss
+
     # change the sync config to local
     if args.db_prefix:
         pfx = args.db_prefix + '_'
     else:
         pfx = ''
-    rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = \'f\', protocol = \'xmlrpc\', login = \'%s\', database = \'%sSYNC_SERVER_LOCAL\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, port), db)
+    rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = \'f\', protocol = \'xmlrpc\', login = \'%s\', database = \'%s%s\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, ss, port), db)
     if rc != 0:
         return rc
 
@@ -386,9 +390,6 @@ def delive(args, db):
 
     # Now we check for arguments allowing auto-sync and silent-upgrade
     if args.autosync:
-        ss = 'SYNC_SERVER_LOCAL'
-        if args.ss:
-            ss = args.ss
         activate_autosync(args, db, ss)
         rc = psql(args, 'update ir_cron set active = \'t\', interval_type = \'hours\', interval_number = 2, nextcall = current_timestamp + interval \'1 hour\' where model = \'sync.client.entity\' and function = \'sync_threaded\';', db)
         if rc != 0:
