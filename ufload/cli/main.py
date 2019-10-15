@@ -16,6 +16,8 @@ def _home():
 
 _logs = []
 args=[]
+#Create log file (if it does not exist, else append to existing file)
+filename = '%s/uf_%s.log' % (args.local, time.strftime('%Y%m%d%H%M%S'))
 def _progress(p):
     global _logs, args
     p = time.strftime('%H:%M:%S') + ': ' + p
