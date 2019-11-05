@@ -16,6 +16,7 @@ def _home():
 
 _logs = []
 args=[]
+starttime = time.strftime('%Y%m%d%H%M%S')
 def _progress(p):
     global _logs, args
     p = time.strftime('%H:%M:%S') + ': ' + p
@@ -29,7 +30,7 @@ def _progress(p):
         except:
             os.mkdir(args.local)
         #Create log file (if it does not exist, else append to existing file)
-        filename = '%s/uf_%s.log' % (args.local, time.strftime('%Y%m%d'))
+        filename = '%s/uf_%s.log' % (args.local, starttime)
         #Write logs to file
         with open(filename, 'ab') as file:
             #file.write('\n'.join(_logs))
