@@ -48,7 +48,7 @@ def instance_to_dir(instance):
 
     return ''
 
-def get_cloud_info(args):
+def get_cloud_info(args, sub_dir=''):
 
     #Cloud password is encrypted
     pword = _decrypt(args.pw)
@@ -59,9 +59,19 @@ def get_cloud_info(args):
     else:
         dir = ''    #No OC specified, let's use only the path
 
+    sub = args.cloud_path
+
+    try:
+        #if the argument patchcloud is set, we're downloading the upgrade patch, go to the right directory (MUST be under the main dir)
+        if (sub_dir is not None):
+            sub = sub + sub_dir
+    except:
+        #The argument cloudpath is not defined, forget about it (this is not the upgrade process)
+        pass
+
     ret = {
         'url': args.cloud_url,
-        'dir': dir + args.cloud_path,
+        'dir': dir + sub,
         'site': dir,
         'path': args.cloud_path,
         'login': args.user,
@@ -96,7 +106,7 @@ def get_onedrive_connection(args):
 
 
 def _get_all_files_and_timestamp(dav, d):
-    ufload.progress('Listing files from dir %s' % d)
+    ufload.progress('Browsing files from dir %s' % d)
     try:
         #all_zip = dav.ls(d)
         all_zip = dav.list(d)
@@ -120,7 +130,7 @@ def _get_all_files_and_timestamp(dav, d):
         if abs(time.time() - time.mktime(t)) < 900:
             continue
 
-        ufload.progress('File found: %s' % f['Name'])
+        # ufload.progress('File found: %s' % f['Name'])
 
         if f['Name'].split(".")[-1] != "zip":
             logging.warn("Ignoring non-zipfile: %s" % f['Name'])
@@ -184,6 +194,18 @@ def list_files(**kwargs):
         if _match_any_wildcard(inst, i.lower()):
             ret[i] = all[i]
     return ret
+
+# list_files returns a dictionary of instances
+# and for each instance, a list of (path,file) tuples
+# in order from new to old.
+def list_patches(**kwargs):
+    directory = kwargs['where']
+
+    all = _get_all_files_and_timestamp(kwargs['dav'], directory)
+
+    return all
+
+
 
 def peek_inside_local_file(path, fn):
     try:
