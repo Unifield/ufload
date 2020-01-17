@@ -13,7 +13,7 @@ from office365.runtime.client_request import ClientRequest
 from office365.runtime.utilities.http_method import HttpMethod
 from office365.runtime.utilities.request_options import RequestOptions
 from office365.sharepoint.client_context import ClientContext
-
+import time
 
 
 class ConnectionFailed(Exception):
@@ -27,20 +27,27 @@ class Client(object):
         if not self.path.endswith('/'):
             self.path = '%s/' % self.path
 
+        self.username = username
+        self.password = password
+
         # oneDrive: need to split /site/ and path
         # in our config site is /personal/UF_OCX_msf_geneva_msf_org/
         # path is /Documents/Tests/
         self.baseurl = '{0}://{1}:{2}{3}/'.format(protocol, host, port, '/'.join(self.path.split('/')[0:3]) )
         ctx_auth = AuthenticationContext(self.baseurl)
 
-        #if len(self.path.split('/')) < 5:
-        #    self.path = '%sDocuments/' % self.path
-        if ctx_auth.acquire_token_for_user(username, cgi.escape(password)):
+        self.login()
+
+    def login(self):
+        ctx_auth = AuthenticationContext(self.baseurl)
+
+        if ctx_auth.acquire_token_for_user(self.username, cgi.escape(self.password)):
             self.request = ClientRequest(ctx_auth)
             self.request.context = ClientContext(self.baseurl, ctx_auth)
 
             if not ctx_auth.provider.FedAuth or not ctx_auth.provider.rtFa:
                 raise ConnectionFailed(ctx_auth.get_last_error())
+
         else:
             raise ConnectionFailed(ctx_auth.get_last_error())
 
@@ -74,7 +81,6 @@ class Client(object):
         #webUri = '%s%s' % (self.path, remote_path)
         #request_url = "%s_api/web/getfilebyserverrelativeurl('%s')/files" % (self.baseurl, webUri)
         request_url = "%s_api/web/getfolderbyserverrelativeurl('%s')/files" % (self.baseurl, remote_path)
-        print request_url
         options = RequestOptions(request_url)
         options.method = HttpMethod.Get
         options.set_header("X-HTTP-Method", "GET")
@@ -97,7 +103,6 @@ class Client(object):
             item = result['d']['results'][i]
             files.append(item)
 
-        print files[0]['Name']
         return files
 
     def download(self, remote_path, filename):
@@ -108,10 +113,23 @@ class Client(object):
         options.set_header('accept', 'application/json;odata=verbose')
         self.request.context.authenticate_request(options)
         self.request.context.ensure_form_digest(options)
-        result = requests.get(url=request_url, headers=options.headers, auth=options.auth)
+        retry = 5
+        while retry:
+            with requests.get(url=request_url, headers=options.headers, auth=options.auth, stream=True, timeout=120) as r:
+                if r.status_code not in (200, 201):
+                    error = self.parse_error(r)
+                    if 'timed out' in error or '2130575252' in error:
+                        time.sleep(2)
+                        self.login()
+                        retry -= 1
+                        continue
+                    raise Exception(error)
 
-        with open(filename, 'wb') as file:
-            file.write(result.content)
+                with open(filename, 'wb') as file:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:
+                            file.write(chunk)
+                retry = 0
 
         return filename
 
@@ -171,4 +189,21 @@ class Client(object):
             if not x:
                 break
         return True
+
+    def parse_error(self, result):
+        try:
+            if 'application/json' in result.headers.get('Content-Type'):
+                resp_content = result.json()
+                msg = resp_content['odata.error']['message']
+                error = []
+                if isinstance(msg, dict):
+                    error = [msg['value']]
+                else:
+                    error = [msg]
+                if resp_content['odata.error'].get('code'):
+                    error.append('Code: %s' % resp_content['odata.error']['code'])
+                return ' '.join(error)
+        except:
+            pass
+        return result.text
 

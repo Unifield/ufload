@@ -292,7 +292,11 @@ def _multiRestore(args):
                 elif i.startswith('OCP_'):
                     dav.change_oc(baseurl, 'OCP')
 
-            filename = dav.download(j[0],j[1])
+            try:
+                filename = dav.download(j[0],j[1])
+            except Exception, e:
+                ufload.progress("Error upload %s" % e)
+                continue
 
             filesize = os.path.getsize(filename) / (1024 * 1024)
             ufload.progress("File size: %s Mb" % filesize)
