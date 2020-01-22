@@ -430,6 +430,9 @@ def _syncLink(args, dbs, sdb):
     # Arrange that all instances use admin as the sync user
     ufload.db.sync_server_all_admin(args, sdb)
 
+    # manage gap in sync update sequence
+    ufload.db.psql(args, "update ir_sequence set number_next=number_next+1000 where code='sync.server.update';", sdb)
+
     # Hook up all the databases we are currently working on
     hwid = ufload.db.get_hwid(args)
     if hwid is None:
