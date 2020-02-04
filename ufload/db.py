@@ -99,7 +99,10 @@ def load_zip_into(args, db, f, sz):
     db2 = db + "_" + str(os.getpid())
 
     ufload.progress("Create database "+db2)
-    rc = psql(args, 'CREATE DATABASE \"%s\"' % db2)
+    tablespace = ""
+    if args.db_tablespace:
+        tablespace = 'TABLESPACE "%s"'%args.db_tablespace
+    rc = psql(args, 'CREATE DATABASE \"%s\" %s' % (db2, tablespace))
     if rc != 0:
         return rc
 
@@ -206,7 +209,10 @@ def load_dump_into(args, db, f, sz):
     db2 = db + "_" + str(os.getpid())
 
     ufload.progress("Create database " + db2)
-    rc = psql(args, 'CREATE DATABASE \"%s\"' % db2)
+    tablespace = ""
+    if args.db_tablespace:
+        tablespace = 'TABLESPACE "%s"'%args.db_tablespace
+    rc = psql(args, 'CREATE DATABASE \"%s\" %s' % (db2, tablespace))
     if rc != 0:
         return rc
 
