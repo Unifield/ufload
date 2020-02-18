@@ -765,6 +765,7 @@ def parse():
     parser.add_argument("-db-host", help="Postgres host")
     parser.add_argument("-db-port", help="Postgres port")
     parser.add_argument("-db-user", help="Postgres user")
+    parser.add_argument("-db-tablespace", help="Create db in psql tablespace")
     parser.add_argument("-db-pw", help="Postgres password")
     parser.add_argument("-db-prefix", help="Prefix to put on database names")
     parser.add_argument("-killconn", help="The command to run kill connections to the databases.")
