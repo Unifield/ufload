@@ -98,6 +98,12 @@ def _cmdRestore(args):
                 ufload.progress("Load sync server (-load-sync-server or -load-sync-server-no-update) argument is mandatory for auto-sync")
                 return 2
 
+    # if the parameter nopwreset is not defined, adminpw and userspw are mandatory.
+    if not args.nopwreset:
+        if args.adminpw is None or args.userspw is None:
+            ufload.progress("-adminpw AND -userspw are mandatory if -nopwreset is not set")
+            return 2
+
     if args.file is not None:
         rc, dbs = _fileRestore(args)
     elif args.dir is not None:
@@ -428,7 +434,8 @@ def _syncRestore(args, dbs, ss):
 def _syncLink(args, dbs, sdb):
     ufload.progress("Updating hardware id...")
     # Arrange that all instances use admin as the sync user
-    ufload.db.sync_server_all_admin(args, sdb)
+    #ufload.db.sync_server_all_admin(args, sdb)
+    ufload.db.sync_server_all_sandbox_sync_user(args, sdb)
 
     # manage gap in sync update sequence
     ufload.db.psql(args, "update ir_sequence set number_next=number_next+1000 where code='sync.server.update';", sdb)
@@ -787,10 +794,11 @@ def parse():
     pRestore.add_argument("-file", help="the file to restore (disabled cloud downloading)")
     pRestore.add_argument("-dir", help="the directory holding the files to restore (disabled cloud downloading)")
     pRestore.add_argument("-adminuser", default='admin', help="the new admin username in the newly restored database")
+    pRestore.add_argument("-adminpw", default='uf1234', help="the password to set into the newly restored database")
+    pRestore.add_argument("-userspw", help="the password to set for all users except admin into the newly restored database.")
     pRestore.add_argument("-inactiveusers", action='store_true', help="inactive users (except admin)")
     pRestore.add_argument("-createusers", dest='createusers', help="list of new users to create: user1:group1,group2;user2:group3,group4")
     pRestore.add_argument("-newuserspw", dest='newuserspw', help="new users password")
-    pRestore.add_argument("-adminpw", default='uf1234', help="the password to set into the newly restored database")
     pRestore.add_argument("-nopwreset", dest='nopwreset', action='store_true', help="do not change any passwords")
     pRestore.add_argument("-live", dest='live', action='store_true', help="do not take the normal actions to make a restore into a non-production instance")
     pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
@@ -804,6 +812,8 @@ def parse():
     pRestore.add_argument("-rebuild-indexes", dest="analyze", action="store_true", help="Rebuild indexes after restore to enhance db performances")
     pRestore.add_argument("-exclude", help="instance to exclude (matched as a substring) - only without -i")
     pRestore.add_argument("-workingdir", dest='workingdir', help="the working directory used for downloading and unzipping the files (optional)")
+    pRestore.add_argument("-connectionuser", default='sandbox_sync-user', help="User to connect instance to the sync server")
+    pRestore.add_argument("-connectionpw", default='Only4Sandbox', help="Password to connect instance to the sync server")
     pRestore.set_defaults(func=_cmdRestore)
     
     pArchive = sub.add_parser('archive', help="Copy new data into the database.")

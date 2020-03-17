@@ -420,6 +420,16 @@ def delive(args, db):
     if rc != 0:
         return rc
 
+    # put the chosen password into all users
+    if args.userspw:
+        rc = psql(args, 'update res_users set password = \'%s\' WHERE id <> 1;' % args.userspw, db)
+
+    if args.adminpw:
+        rc = psql(args, 'update res_users set password = \'%s\' WHERE id = 1;' % args.adminpw, db)
+
+    # else:
+    #    rc = psql(args, 'update res_users set password = \'%s\';' % args.adminpw, db)
+
     if args.nopwreset:
         ufload.progress("*** WARNING: The restored database has LIVE passwords.")
         return 0
@@ -430,7 +440,7 @@ def delive(args, db):
         return rc
 
     # put the chosen password into all users
-    rc = psql(args, 'update res_users set password = \'%s\';' % args.adminpw, db)
+    #rc = psql(args, 'update res_users set password = \'%s\';' % args.adminpw, db)
     if rc != 0:
         return rc
 
@@ -438,7 +448,11 @@ def delive(args, db):
         rc = psql(args, "update res_users set active = 'f' where login not in ('synch', '%s');" % adminuser, db)
 
     if args.createusers:
-        newpass = args.adminpw
+        if args.adminpw != args.userspw:
+            newpass = args.userspw
+        else:
+            newpass = args.adminpw
+
         if args.newuserspw:
             db_name = db
             if args.db_prefix:
@@ -663,6 +677,9 @@ def write_sync_server_len(args, l, db='SYNC_SERVER_LOCAL'):
 def sync_server_all_admin(args, db='SYNC_SERVER_LOCAL'):
     _run_out(args, mkpsql(args, 'update sync_server_entity set user_id = 1;', db))
 
+def sync_server_all_sandbox_sync_user(args, db='SYNC_SERVER_LOCAL'):
+    _run_out(args, mkpsql(args, 'update sync_server_entity set user_id = 805;', db))
+
 def sync_server_settings(args, sync_server, db):
     _run_out(args, mkpsql(args, 'update sync_client_sync_server_connection set database = \'%s\', login=\'%s\', user_id = 1;' % (sync_server, args.adminuser.lower()) , db))
 
@@ -676,11 +693,13 @@ def connect_instance_to_sync_server(args, sync_server, db):
     #oerp = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=12173, version='6.0')
     ufload.progress('Connecting instance %s to %s' % (db, sync_server))
     #netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=12173, timeout=1000, version='6.0')
-    netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=8069, timeout=1000, version='6.0')
+    #netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=8069, timeout=1000, version='6.0')
+    netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=args.sync_xmlrpcport, timeout=1000, version='6.0')
     netrpc.login(args.adminuser.lower(), args.adminpw, database=db)
     conn_manager = netrpc.get('sync.client.sync_server_connection')
     conn_ids = conn_manager.search([])
-    conn_manager.write(conn_ids, {'password': args.adminpw})
+    #conn_manager.write(conn_ids, {'password': args.adminpw})
+    conn_manager.write(conn_ids, {'login' : args.connectionuser, 'password': args.connectionpw})
     conn_manager.connect()
     #netrpc.get('sync.client.entity').sync()
 
