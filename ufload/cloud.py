@@ -269,8 +269,12 @@ def openDumpInZip(fn):
     if len(names) != 1:
         logging.warn("Zipfile %s has unexpected files in it: %s" % (fn, names))
         return None, 0
+    try:
+        file = z.open(names[0])
+    except:
+        logging.warn("Zipfile %s is probably corrupted" % fn)
+        return None, 0
 
-    file = z.open(names[0])
     filename = file.name
     size = z.getinfo(names[0]).file_size
     file.close()
