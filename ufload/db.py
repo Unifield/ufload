@@ -694,18 +694,21 @@ def connect_instance_to_sync_server(args, sync_server, db):
     if args.sync_xmlrpcport:
         port = int(args.sync_xmlrpcport)
 
-    #oerp = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=12173, version='6.0')
-    ufload.progress('Connecting instance %s to %s' % (db, sync_server))
-    #netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=12173, timeout=1000, version='6.0')
-    #netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=8069, timeout=1000, version='6.0')
-    netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=port, timeout=1000, version='6.0')
-    netrpc.login(args.adminuser.lower(), args.adminpw, database=db)
-    conn_manager = netrpc.get('sync.client.sync_server_connection')
-    conn_ids = conn_manager.search([])
-    #conn_manager.write(conn_ids, {'password': args.adminpw})
-    conn_manager.write(conn_ids, {'login' : args.connectionuser, 'password': args.connectionpw})
-    conn_manager.connect()
-    #netrpc.get('sync.client.entity').sync()
+    try:
+        #oerp = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=12173, version='6.0')
+        ufload.progress('Connecting instance %s to %s' % (db, sync_server))
+        #netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=12173, timeout=1000, version='6.0')
+        #netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=8069, timeout=1000, version='6.0')
+        netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=port, timeout=1000, version='6.0')
+        netrpc.login(args.adminuser.lower(), args.adminpw, database=db)
+        conn_manager = netrpc.get('sync.client.sync_server_connection')
+        conn_ids = conn_manager.search([])
+        #conn_manager.write(conn_ids, {'password': args.adminpw})
+        conn_manager.write(conn_ids, {'login' : args.connectionuser, 'password': args.connectionpw})
+        conn_manager.connect()
+        #netrpc.get('sync.client.entity').sync()
+    except oerplib.error.RPCError as e:
+         ufload.progress("Error: unable to connect instance to the sync server: %s" % e.args[0])
 
 def manual_sync(args, sync_server, db):
     if db.startswith('SYNC_SERVER'):
