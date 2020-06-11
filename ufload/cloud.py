@@ -97,11 +97,14 @@ def get_onedrive_connection(args):
     path = info.get('site') + url.path
 
     try:
-        dav = webdav.Client(url.netloc, port=url.port, protocol=url.scheme, username=info['login'], password=info['password'], path=path)
+        dav = webdav.Client(url.netloc, port=url.port, protocol=url.scheme, username=info['login'],
+                            password=info['password'], path=path)
+        return dav
     except webdav.ConnectionFailed, e:
-        ufload.progress('Unable to connect: %s') % (e.message)
+        ufload.progress('Unable to connect: {}'.format(e))
+        ufload.progress('Cannot proceed without connection, exiting program.')
+        exit(1)
 
-    return dav
 
 
 
