@@ -28,13 +28,13 @@ def find_version(*file_paths):
 
 
 install_requires = [
-    'pyOpenSSL',
-    'ndg-httpsclient',
-    'pyasn1',
-    'easywebdav',
-    'oerplib',
-    'pybase64',
-    'Office365-REST-Python-Client'
+    'pyOpenSSL==19.1.0',
+    'ndg-httpsclient==0.5.1',
+    'pyasn1==0.4.8',
+    'easywebdav==1.2.0',
+    'oerplib==0.8.4',
+    'pybase64==0.5.0',
+    'Office365-REST-Python-Client==2.1.5'
 ]
 
 tests_require = [
