@@ -198,7 +198,7 @@ def load_zip_into(args, db, f, sz):
         ufload.progress("Cleanup: dropping table %s" % db2)
         killCons(args, db2)
         psql(args, 'DROP DATABASE \"%s\"'%db2)
-        return e.rc
+        return 1
 
 
 def load_dump_into(args, db, f, sz):
@@ -709,6 +709,8 @@ def connect_instance_to_sync_server(args, sync_server, db):
         #netrpc.get('sync.client.entity').sync()
     except oerplib.error.RPCError as e:
          ufload.progress("Error: unable to connect instance to the sync server: %s" % e.args[0])
+    except:
+         ufload.progress("Unexpected error: unable to connect instance to the sync server: %s" % sys.exc_info()[0])
 
 def manual_sync(args, sync_server, db):
     if db.startswith('SYNC_SERVER'):
