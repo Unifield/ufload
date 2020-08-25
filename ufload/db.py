@@ -416,7 +416,7 @@ def delive(args, db):
         # when loading on non-windows, to a local database, use /tmp
         directory = '\'/tmp\''
 
-    rc = psql(args, 'update backup_config set beforemanualsync=\'f\', beforepatching=\'f\', aftermanualsync=\'f\', beforeautomaticsync=\'f\', afterautomaticsync=\'f\', name = %s;' % directory, db)
+    rc = psql(args, 'update backup_config set beforemanualsync=\'f\', beforepatching=\'f\', aftermanualsync=\'f\', beforeautomaticsync=\'f\', afterautomaticsync=\'f\', scheduledbackup=\'f\', name = %s;' % directory, db)
     if rc != 0:
         return rc
 
