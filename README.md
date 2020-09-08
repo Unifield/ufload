@@ -31,12 +31,21 @@ by a semi-colon:
 ```
 [owncloud]
 user=username
-pw=password for ownCloud
-oc=which OC's backups you are using: OCG, OCA, or OCB
+pw=password for OneDrive backup
+oc=your OC:OCA/OCB/OCG/OCP
 
 [postgres]
 db_user=openpg
-db_pw=your database password
+db_pw=yourdatabasepassword
+
+[restore]
+#adminuser=admin
+#adminpw=youradminpassword
+#userspw=youruserpassword
+workingdir=D:\
+
+[logs]
+local=D:\logs
 ```
 6. Use "dir" to confirm that the file is where you expect it to be, and is named "ufload.txt" and not "ufload.txt.txt".
 
