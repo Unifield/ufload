@@ -143,7 +143,10 @@ def _get_all_files_and_timestamp(dav, d):
 
 # returns True if x has instance as a substring
 def _match_instance_name(instance, x):
-    return instance in x
+    for pat in instance.split(','):
+        if pat in x:
+            return True
+    return False
 
 # returns True is any of the instances match x
 # (returns True for all if instances is empty)
