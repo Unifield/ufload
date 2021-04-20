@@ -471,9 +471,18 @@ def delive(args, db):
 
         for new_user_info in args.createusers.split(';'):
             new_user, groups = new_user_info.split(':')
+            new_user_data = new_user_info.split(':')
+            if len(new_user_data) == 3:
+                new_user= new_user_data[0]
+                new_user_pass = new_user_data[1]
+                groups = new_user_data[2]
+            else:
+                new_user= new_user_data[0]
+                new_user_pass = newpass
+                groups = new_user_data[1]
             rc, new_userid = psql(args, """ insert into res_users (name, active, login, password, context_lang, company_id, view, menu_id) values
                 ('%s', 't', '%s', '%s', 'en_MF', 1, 'simple', 1) returning id;"""
-                % (new_user, new_user.lower(), newpass), db, silent=True)
+                % (new_user, new_user.lower(), new_user_pass), db, silent=True)
             if rc != 0:
                 return rc
             for new_group in  groups.split(','):
