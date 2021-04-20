@@ -470,7 +470,6 @@ def delive(args, db):
                 newpass = ''.join(new_pass_dict)
 
         for new_user_info in args.createusers.split(';'):
-            new_user, groups = new_user_info.split(':')
             new_user_data = new_user_info.split(':')
             if len(new_user_data) == 3:
                 new_user= new_user_data[0]
