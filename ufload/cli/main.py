@@ -192,10 +192,10 @@ def _dirRestore(args):
             return 1, None
 
         with open(fullfile, 'rb') as f:
-            rc = ufload.db.load_dump_into(args, db, f, sz)
+            ufload.db.load_dump_into(args, db, f, sz)
 
         if not args.noclean:
-            rc = ufload.db.clean(args, db)
+            ufload.db.clean(args, db)
 
         if args.notify:
             subprocess.call([args.notify, db])
@@ -365,7 +365,7 @@ def _multiRestore(args):
                 break
             try:
                 os.unlink(j[1])
-            except Exception as ex:
+            except Exception:
                 pass
 
     if args.ss is not None and args.sync is None and args.synclight is None:
@@ -509,15 +509,15 @@ def _cmdUpgrade(args):
         'last_version' : '',
         'user_rights_updated' : ''
     }
-    
+
     #Install the patch on the sync server
     ss = 'SYNC_SERVER_LOCAL'
     if args.ss:
         ss = args.ss
-        
-    if args.patchcloud is not None: 
+
+    if args.patchcloud is not None:
         if not _required(args, [ 'adminuser', 'adminpw' ]):
-            return 2           
+            return 2
         #Connect to OD (cloud access)
         info = ufload.cloud.get_cloud_info(args, args.patchcloud)
         ufload.progress('site=%s - path=%s - dir=%s' % (info.get('site'), info.get('path'), info.get('dir')))
@@ -545,29 +545,28 @@ def _cmdUpgrade(args):
             m = re.search('(.+?)\.patch\.zip', filename)
             if m:
                 args.version = m.group(1)
-               
+
             if ufload.db.installPatch(args, ss) == 0:
                 i += 1
             else:
                 summarize['initial_version'] = args.version
-            summarize['last_version'] = args.version 
+            summarize['last_version'] = args.version
             os.remove(filename)
         if i == 0:
             ufload.progress("No new patches found")
             if args.userrightscloud is None or not args.forcesync:
                 return 0
     else:
-        
+
         if not _required(args, [ 'patch', 'version', 'adminuser', 'adminpw' ]):
             return 2
-    
+
         if ufload.db.installPatch(args, ss) == -1:
             ufload.progress("No new patches found")
             if args.userrightscloud is None or not args.forcesync:
                 return 0
 
     #List instances
-    inst = []
     if args.i is not None:
         instances = [x for x in args.i]
     else:
@@ -575,11 +574,11 @@ def _cmdUpgrade(args):
 
     #Update hardware_id and entity names in the Sync Server
     _syncLink(args, instances, ss)
-        
+
 
     update_src = True
     update_available = False
-    
+
     #Upgrade Unifield
     for instance in instances:
         if instance and instance != ss:
@@ -592,8 +591,8 @@ def _cmdUpgrade(args):
                     update_available = True
                 else:
                     raise oerplib.error.RPCError(err)
-            
-            
+
+
             i = 0
             while update_src:
                 try:
@@ -616,7 +615,7 @@ def _cmdUpgrade(args):
             if not update_src:
                 ufload.progress("No valid Update valid.")
                 break
-                    
+
             if update_available:
                 ufload.progress("Upgrading Unifield App")
                 ufload.db.manual_upgrade(args, ss, instance)
@@ -638,17 +637,17 @@ def _cmdUpgrade(args):
                         r.raise_for_status()
                     except requests.exceptions.ConnectionError:
                         starting_up = False
-                    except requests.exceptions.HTTPError as http_err:
+                    except requests.exceptions.HTTPError:
                         pass
                     sys.stdout.write('\b')
-                sys.stdout.write('\r')    
+                sys.stdout.write('\r')
                 if i >= max_incrementation and not starting_up:
                     raise ValueError('The UniField serveur can not be restarted!!')
-                    
+
                 break
-    
-    #Update instances            
-    if args.migratedb and update_src:            
+
+    #Update instances
+    if args.migratedb and update_src:
         for instance in instances:
             update_modules = True
             i = 0
@@ -659,13 +658,13 @@ def _cmdUpgrade(args):
             while update_modules and i < max_incrementation:
                 update_modules = False
                 try:
-                    netrpc = ufload.db.connect_rpc(args, ss, instance)
+                    ufload.db.connect_rpc(args, ss, instance)
                 except oerplib.error.RPCError as err:
                     ufload._progress("error.RPCError: {0}".format(err[0]))
                     # regex = r""".*Cannot check for updates: There is/are [0-9]+ revision\(s\) available."""
                     # flags = re.S
                     # if re.compile(regex, flags).match(err[0]) or err[0].endswith('Server is updating modules ...'):
-                        # update_modules = True
+                    # update_modules = True
                     # elif err[0].endswith('ServerUpdate: Server is updating modules ...'):
                     if err[0].endswith('ServerUpdate: Server is updating modules ...'):
                         update_modules = True
@@ -676,15 +675,15 @@ def _cmdUpgrade(args):
                 for j in range(sleep_time):
                     sys.stdout.write(next(spinner))
                     sys.stdout.flush()
-                    time.sleep(1) 
+                    time.sleep(1)
                     sys.stdout.write('\b')
                 i +=1
-            sys.stdout.write('\r') 
+            sys.stdout.write('\r')
             if i >= max_incrementation and not update_modules:
-                raise ValueError("tolong wait for updating module instance %s".format(instance))   
+                raise ValueError("tolong wait for updating module instance %s".format(instance))
 
     if args.userrightscloud is not None:
-                   
+
         #Connect to OD (cloud access)
         info = ufload.cloud.get_cloud_info(args, args.userrightscloud)
         ufload.progress('site=%s - path=%s - dir=%s' % (info.get('site'), info.get('path'), info.get('dir')))
@@ -701,7 +700,7 @@ def _cmdUpgrade(args):
             ufload.progress("No User Rights found.")
             return 1
         patches.sort(key=lambda s: map(int, re.split('\.|-|p',re.search('User Rights v(.+?).zip',  s[1], re.I).group(1))))
- 
+
         urfilename = None
         for j in patches:
             urfilename = dav.download(j[2], j[1])
@@ -718,8 +717,8 @@ def _cmdUpgrade(args):
                 else:
                     raise oerplib.error.RPCError(err)
             os.remove(urfilename)
- 
-            
+
+
     if args.forcesync and ( not args.userrightscloud or ( args.userrightscloud and summarize['user_rights_updated'] != '' )):
         if instance and instance != ss:
             for instance in instances:
@@ -741,12 +740,12 @@ def _cmdUpgrade(args):
                 if args.silentupgrade:
                     #activate silent upgrade
                     ufload.db.activate_silentupgrade(args, instance)
-                    
+
     ufload.progress(" *** summarize ***" )
-    ufload.progress(" * Initial version installed: {}".format(summarize['initial_version']) ) 
+    ufload.progress(" * Initial version installed: {}".format(summarize['initial_version']) )
     ufload.progress(" * Last version installed: {}".format(summarize['last_version']) )
     if args.userrightscloud is not None:
-        ufload.progress(" * User Rights updated : {}".format(summarize['user_rights_updated'] if summarize['user_rights_updated'] else 'None' ) ) 
+        ufload.progress(" * User Rights updated : {}".format(summarize['user_rights_updated'] if summarize['user_rights_updated'] else 'None' ) )
 
     return 0
 
@@ -815,7 +814,7 @@ def parse():
     pRestore.add_argument("-connectionuser", default='sandbox_sync-user', help="User to connect instance to the sync server")
     pRestore.add_argument("-connectionpw", default='Only4Sandbox', help="Password to connect instance to the sync server")
     pRestore.set_defaults(func=_cmdRestore)
-    
+
     pArchive = sub.add_parser('archive', help="Copy new data into the database.")
     pArchive.add_argument("-from-dsn", action="append", help="the database to copy from (in the form of a DSN: 'hostaddr=x dbname=x user=x password=x')")
     pArchive.set_defaults(func=_cmdArchive)
