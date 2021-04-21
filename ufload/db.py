@@ -193,7 +193,7 @@ def load_zip_into(args, db, f, sz):
 
         return 0
     except Exception as e:
-        ufload.progress("Unexpected error %s" % sys.exc_info()[0])
+        ufload.progress("Unexpected error %s" % "\n".join(sys.exc_info()))
         # something went wrong, so drop the temp table
         ufload.progress("Cleanup: dropping table %s" % db2)
         killCons(args, db2)
@@ -319,13 +319,13 @@ def load_dump_into(args, db, f, sz):
         return 0
     except dbException as e:
         # something went wrong, so drop the temp table
-        ufload.progress("Unexpected error %s" % sys.exc_info()[0])
+        ufload.progress("Unexpected error %s" % "\n".join(sys.exc_info()))
         ufload.progress("Cleanup: dropping db %s" % db2)
         killCons(args, db2)
         psql(args, 'DROP DATABASE \"%s\"' % db2)
         return e.rc
     except:
-        ufload.progress("Unexpected error %s" % sys.exc_info()[0])
+        ufload.progress("Unexpected error %s" % "\n".join(sys.exc_info()))
         ufload.progress("Cleanup: dropping db %s" % db2)
         killCons(args, db2)
         psql(args, 'DROP DATABASE \"%s\"' % db2)
@@ -382,18 +382,14 @@ def delive(args, db):
     if rc != 0:
         return rc
     # Automated import settings
-    rc = psql(args, 'UPDATE automated_import SET report_path=\'\', src_path=\'\', ftp_url=\'\', dest_path=\'\', ftp_ok=\'f\', ftp_port=\'\',dest_path_failure=\'\', ftp_login=\'\', ftp_password=\'\', ftp_protocol=\'\';', db)
-    #if rc != 0:
-    #    return rc
+    psql(args, 'UPDATE automated_import SET report_path=\'\', src_path=\'\', ftp_url=\'\', dest_path=\'\', ftp_ok=\'f\', ftp_port=\'\',dest_path_failure=\'\', ftp_login=\'\', ftp_password=\'\', ftp_protocol=\'\';', db)
 
     # Automated export jobs
     rc = psql(args, 'update ir_cron set active = \'f\' where model = \'automated.export\';', db)
     if rc != 0:
         return rc
     # Automated export settings
-    rc = psql(args, 'UPDATE automated_export SET report_path=\'\', ftp_url=\'\', dest_path=\'\', ftp_ok=\'f\', ftp_port=\'\',dest_path_failure=\'\', ftp_login=\'\', ftp_password=\'\', ftp_protocol=\'\';', db)
-    #if rc != 0:
-    #    return rc
+    psql(args, 'UPDATE automated_export SET report_path=\'\', ftp_url=\'\', dest_path=\'\', ftp_ok=\'f\', ftp_port=\'\',dest_path_failure=\'\', ftp_login=\'\', ftp_password=\'\', ftp_protocol=\'\';', db)
 
     # Now we check for arguments allowing auto-sync and silent-upgrade
     if args.autosync:
@@ -409,6 +405,16 @@ def delive(args, db):
         rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = \'t\';', db)
         if rc != 0:
             return rc
+
+    if args.deletegroups:
+        for to_del in args.deletegroups.split(','):
+            psql(args, "delete from res_groups where name ilike '%s';" % to_del, db)
+
+    if args.logo:
+         psql(args, "update res_company set logo='%s';" % base64.encodestring(open(args.logo, 'rb').read()), db)
+
+    if args.banner:
+         psql(args, "update communication_config set message=$ESC$%s$ESC$;" % args.banner, db)
 
     # Set the backup directory
     directory = "E'd:\\\\'"
@@ -426,9 +432,6 @@ def delive(args, db):
 
     if args.adminpw:
         rc = psql(args, 'update res_users set password = \'%s\' WHERE id = 1;' % args.adminpw, db)
-
-    # else:
-    #    rc = psql(args, 'update res_users set password = \'%s\';' % args.adminpw, db)
 
     if args.nopwreset:
         ufload.progress("*** WARNING: The restored database has LIVE passwords.")
@@ -718,7 +721,7 @@ def connect_instance_to_sync_server(args, sync_server, db):
     except oerplib.error.RPCError as e:
          ufload.progress("Error: unable to connect instance to the sync server: %s" % e.args[0])
     except:
-         ufload.progress("Unexpected error: unable to connect instance to the sync server: %s" % sys.exc_info()[0])
+         ufload.progress("Unexpected error: unable to connect instance to the sync server: %s" % "\n".join(sys.exc_info()))
 
 def manual_sync(args, sync_server, db):
     if db.startswith('SYNC_SERVER'):

@@ -92,6 +92,10 @@ def _cmdRestore(args):
     #     if not _required(args, [ 'syncuser', 'syncpw' ]):
     #         return 2
 
+    if args.logo and not os.path.isfile(args.logo):
+        ufload.progress("Logo path %s not found" % args.logo)
+        return 2
+
     if args.autosync is not None:
         if not _required(args, [ 'sync' ]):
             if not _required(args, [ 'synclight' ]):
@@ -793,12 +797,13 @@ def parse():
     pRestore.add_argument("-file", help="the file to restore (disabled cloud downloading)")
     pRestore.add_argument("-dir", help="the directory holding the files to restore (disabled cloud downloading)")
     pRestore.add_argument("-adminuser", default='admin', help="the new admin username in the newly restored database")
-    pRestore.add_argument("-adminpw", default='uf1234', help="the password to set into the newly restored database")
+    pRestore.add_argument("-adminpw", help="the password to set into the newly restored database")
     pRestore.add_argument("-userspw", help="the password to set for all users except admin into the newly restored database.")
     pRestore.add_argument("-inactiveusers", action='store_true', help="inactive users (except admin)")
-    pRestore.add_argument("-createusers", dest='createusers', help="list of new users to create: user1:group1,group2;user2:group3,group4")
+    pRestore.add_argument("-createusers", dest='createusers', help="list of new users to create: user1:group1,group2;user2:newpass:group3,group4")
     pRestore.add_argument("-newuserspw", dest='newuserspw', help="new users password")
     pRestore.add_argument("-nopwreset", dest='nopwreset', action='store_true', help="do not change any passwords")
+    pRestore.add_argument("-deletegroups", dest='deletegroups', action='store_true', help="comma separated list of groups to delete (allow sql like pattern)")
     pRestore.add_argument("-live", dest='live', action='store_true', help="do not take the normal actions to make a restore into a non-production instance")
     pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
     pRestore.add_argument("-no-suffix", dest='nosuffix', action="store_true", help="remove the date and time numbers at the end of DB name")
@@ -809,10 +814,12 @@ def parse():
     pRestore.add_argument("-silent-upgrade", dest="silentupgrade", action="store_true", help="Activate silent upgrade on restored instances")
     pRestore.add_argument("-ss", help="Instance name of the sync server (default = SYNC_SERVER_LOCAL)")
     pRestore.add_argument("-rebuild-indexes", dest="analyze", action="store_true", help="Rebuild indexes after restore to enhance db performances")
-    pRestore.add_argument("-exclude", help="instance to exclude (matched as a substring) - only without -i")
+    pRestore.add_argument("-exclude", help="instance to exclude (matched as a substring)")
     pRestore.add_argument("-workingdir", dest='workingdir', help="the working directory used for downloading and unzipping the files (optional)")
     pRestore.add_argument("-connectionuser", default='sandbox_sync-user', help="User to connect instance to the sync server")
     pRestore.add_argument("-connectionpw", default='Only4Sandbox', help="Password to connect instance to the sync server")
+    pRestore.add_argument("-logo", dest='logo', help="path to the new company logo")
+    pRestore.add_argument("-banner", dest='banner', help="text to display in the banner")
     pRestore.set_defaults(func=_cmdRestore)
 
     pArchive = sub.add_parser('archive', help="Copy new data into the database.")
