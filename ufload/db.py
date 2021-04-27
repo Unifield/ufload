@@ -193,7 +193,7 @@ def load_zip_into(args, db, f, sz):
 
         return 0
     except Exception as e:
-        ufload.progress("Unexpected error %s" % "\n".join(sys.exc_info()))
+        ufload.progress("Unexpected error %s" % sys.exc_info()[0])
         # something went wrong, so drop the temp table
         ufload.progress("Cleanup: dropping table %s" % db2)
         killCons(args, db2)
@@ -319,13 +319,13 @@ def load_dump_into(args, db, f, sz):
         return 0
     except dbException as e:
         # something went wrong, so drop the temp table
-        ufload.progress("Unexpected error %s" % "\n".join(sys.exc_info()))
+        ufload.progress("Unexpected error %s" % sys.exc_info()[0])
         ufload.progress("Cleanup: dropping db %s" % db2)
         killCons(args, db2)
         psql(args, 'DROP DATABASE \"%s\"' % db2)
         return e.rc
     except:
-        ufload.progress("Unexpected error %s" % "\n".join(sys.exc_info()))
+        ufload.progress("Unexpected error %s" % sys.exc_info()[0])
         ufload.progress("Cleanup: dropping db %s" % db2)
         killCons(args, db2)
         psql(args, 'DROP DATABASE \"%s\"' % db2)
@@ -721,7 +721,7 @@ def connect_instance_to_sync_server(args, sync_server, db):
     except oerplib.error.RPCError as e:
          ufload.progress("Error: unable to connect instance to the sync server: %s" % e.args[0])
     except:
-         ufload.progress("Unexpected error: unable to connect instance to the sync server: %s" % "\n".join(sys.exc_info()))
+         ufload.progress("Unexpected error: unable to connect instance to the sync server: %s" % sys.exc_info()[0])
 
 def manual_sync(args, sync_server, db):
     if db.startswith('SYNC_SERVER'):
