@@ -690,6 +690,8 @@ def sync_server_all_admin(args, db='SYNC_SERVER_LOCAL'):
 
 def sync_server_all_sandbox_sync_user(args, db='SYNC_SERVER_LOCAL'):
     _run_out(args, mkpsql(args, 'update sync_server_entity set user_id = 805;', db))
+    if args.connectionpw:
+        _run_out(args, mkpsql(args, "update res_users set password ='%s' where id=805;" % args.connectionpw, db))
 
 def sync_server_settings(args, sync_server, db):
     _run_out(args, mkpsql(args, 'update sync_client_sync_server_connection set database = \'%s\', login=\'%s\', user_id = 1;' % (sync_server, args.adminuser.lower()) , db))
