@@ -115,21 +115,28 @@ class Client(object):
         self.request.context.ensure_form_digest(options)
         retry = 5
         while retry:
-            with requests.get(url=request_url, headers=options.headers, auth=options.auth, stream=True, timeout=120) as r:
-                if r.status_code not in (200, 201):
-                    error = self.parse_error(r)
-                    if 'timed out' in error or '2130575252' in error:
-                        time.sleep(2)
-                        self.login()
-                        retry -= 1
-                        continue
-                    raise Exception(error)
+            try:
+                with requests.get(url=request_url, headers=options.headers, auth=options.auth, stream=True, timeout=120) as r:
+                    if r.status_code not in (200, 201):
+                        error = self.parse_error(r)
+                        if 'timed out' in error or '2130575252' in error or '-2147024891' in error:
+                            time.sleep(2)
+                            self.login()
+                            retry -= 1
+                            continue
+                        raise Exception(error)
 
-                with open(filename, 'wb') as file:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        if chunk:
-                            file.write(chunk)
-                retry = 0
+                    with open(filename, 'wb') as file:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            if chunk:
+                                file.write(chunk)
+            except requests.exceptions.RequestException:
+                time.sleep(2)
+                self.login()
+                retry -= 1
+                continue
+
+            retry = 0
 
         return filename
 
