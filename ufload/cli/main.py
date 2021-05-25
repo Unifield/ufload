@@ -274,14 +274,20 @@ def _multiRestore(args):
                                             url=info.get('url'),
                                             site=info.get('site'),
                                             path=info.get('path'))
+
+    if args.exclude is not None:
+        to_remove = []
+        for i in instances:
+            if ufload.cloud._match_instance_name(args.exclude, i):
+                to_remove.append(i)
+        for to_r in  to_remove:
+            del(instances[to_r])
+
     ufload.progress("Instances to be restored: %s" % ", ".join(instances.keys()))
     dbs=[]
     pattern = re.compile('.*-[A-Z]{1}[a-z]{2}\.zip$')
 
     for i in instances:
-        if args.exclude is not None and ufload.cloud._match_instance_name(args.exclude, i):
-            ufload._progress("%s matches -exclude param %s and will not be processed" % (i,args.exclude))
-            continue
 
         files_for_instance = instances[i]
         for j in files_for_instance:
