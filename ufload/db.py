@@ -406,9 +406,10 @@ def delive(args, db):
         if rc != 0:
             return rc
 
-    if args.deletegroups:
-        for to_del in args.deletegroups.split(','):
-            psql(args, "delete from res_groups where name ilike '%s';" % to_del, db)
+    if args.hidegroups:
+        for to_del in args.hidegroups.split(','):
+            psql(args, "update res_groups set set visible_res_groups='f' where name ilike '%s';" % to_del, db)
+            psql(args, "delete from res_groups_users_rel where gid in (select g.id from res_groups g where g.visible_res_groups='f');", db)
 
     if args.logo:
          psql(args, "update res_company set logo='%s';" % base64.encodestring(open(args.logo, 'rb').read()), db)

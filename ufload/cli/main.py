@@ -809,7 +809,7 @@ def parse():
     pRestore.add_argument("-createusers", dest='createusers', help="list of new users to create: user1:group1,group2;user2:newpass:group3,group4")
     pRestore.add_argument("-newuserspw", dest='newuserspw', help="new users password")
     pRestore.add_argument("-nopwreset", dest='nopwreset', action='store_true', help="do not change any passwords")
-    pRestore.add_argument("-deletegroups", dest='deletegroups', action='store_true', help="comma separated list of groups to delete (allow sql like pattern)")
+    pRestore.add_argument("-hidegroups", dest='hidegroups', action='store_true', help="comma separated list of groups to delete (allow sql like pattern)")
     pRestore.add_argument("-live", dest='live', action='store_true', help="do not take the normal actions to make a restore into a non-production instance")
     pRestore.add_argument("-no-clean", dest='noclean', action='store_true', help="do not clean up older databases for the loaded instances")
     pRestore.add_argument("-no-suffix", dest='nosuffix', action="store_true", help="remove the date and time numbers at the end of DB name")
