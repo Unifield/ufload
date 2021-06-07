@@ -805,6 +805,7 @@ def parse():
     pRestore.add_argument("-adminuser", default='admin', help="the new admin username in the newly restored database")
     pRestore.add_argument("-adminpw", help="the password to set into the newly restored database")
     pRestore.add_argument("-userspw", help="the password to set for all users except admin into the newly restored database.")
+    pRestore.add_argument("-pwlist", help="comma list of login1:password1 to change password of dedicated users.")
     pRestore.add_argument("-inactiveusers", action='store_true', help="inactive users (except admin)")
     pRestore.add_argument("-createusers", dest='createusers', help="list of new users to create: user1:group1,group2;user2:newpass:group3,group4")
     pRestore.add_argument("-newuserspw", dest='newuserspw', help="new users password")

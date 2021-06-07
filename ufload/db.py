@@ -431,6 +431,11 @@ def delive(args, db):
     if args.userspw:
         rc = psql(args, 'update res_users set password = \'%s\' WHERE id <> 1;' % args.userspw, db)
 
+    if args.pwlist:
+        for pwlist in args.pwlist.split(','):
+            user, newpw = pwlist.split(':')
+            psql(args, 'update res_users set password = \'%s\' WHERE login =\'%s\';' % (newpw, user), db)
+
     if args.adminpw:
         rc = psql(args, 'update res_users set password = \'%s\' WHERE id = 1;' % args.adminpw, db)
 
