@@ -160,6 +160,11 @@ def load_zip_into(args, db, f, sz):
         # Let's delete uninstalled versions
         rc = psql(args, 'DELETE FROM sync_client_version WHERE state!=\'installed\'', db2)
         _checkrc(rc)
+        psql(args, 'update sync_client_version set patch=NULL', db2)
+        psql(args, 'vacuum full sync_client_version', db2)
+        psql(args, "update sync_client_survey set active ='f'", db2)
+        if 'SYNC' in db2:
+            psql(args, "update sync_server_survey set active ='f'", db2)
 
         # Analyze DB to optimize queries (rebuild indexes...)
         if args.analyze:
@@ -407,6 +412,7 @@ def delive(args, db):
             return rc
 
     if args.hidegroups:
+        psql(args, "truncate ir_ui_view_sc;", db)
         for to_del in args.hidegroups.split(','):
             psql(args, "update res_groups set visible_res_groups='f' where name ilike '%s';" % to_del, db)
             psql(args, "delete from res_groups_users_rel where gid in (select g.id from res_groups g where g.visible_res_groups='f');", db)
