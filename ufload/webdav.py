@@ -5,7 +5,6 @@ import logging
 import os
 import uuid
 
-from collections import namedtuple
 
 import requests
 from office365.runtime.auth.authentication_context import AuthenticationContext

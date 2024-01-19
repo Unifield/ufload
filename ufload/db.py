@@ -6,7 +6,7 @@ from base64 import encodestring
 def _run_out(args, cmd):
     try:
         return subprocess.check_output(cmd, env=pg_pass(args), stderr=subprocess.STDOUT).split('\n')
-    except Exception as e:
+    except Exception:
         return []
 
 def _run(args, cmd, get_out=False, silent=False):
@@ -59,7 +59,10 @@ def pg_common(args):
     return res
 
 def pg_restore(args):
-    return [ _find_exe('pg_restore') ] + pg_common(args)
+    cmd = [ _find_exe('pg_restore') ] + pg_common(args)
+    if args.jobs:
+        cmd += ['-j', '%s'%args.jobs]
+    return cmd
 
 def pg_pass(args):
     env = os.environ.copy()
@@ -92,7 +95,6 @@ def psql_file(args, file, db='postgres', silent=False):
     return _run(args, mkpsql_file(args, file, db), silent)
     
 def load_zip_into(args, db, f, sz):
-    tot = float(sz)
     if sz == 0:
         ufload.progress("Note: No progress percent available.")
     
@@ -197,7 +199,7 @@ def load_zip_into(args, db, f, sz):
                     return rc
 
         return 0
-    except Exception as e:
+    except Exception:
         ufload.progress("Unexpected error %s" % sys.exc_info()[0])
         # something went wrong, so drop the temp table
         ufload.progress("Cleanup: dropping table %s" % db2)
@@ -239,7 +241,8 @@ def load_dump_into(args, db, f, sz):
 
         # Windows pg_restore gets confused when reading from a pipe,
         # so write to a temp file first.
-        if sys.platform == "win32":
+        #if sys.platform == "win32":
+        if sys.platform == "win32" or args.jobs :  #  pg_restore from standard input cannot use -j option
             tf = tempfile.NamedTemporaryFile(delete=False)
             if not args.show:
 
@@ -364,12 +367,14 @@ def delive(args, db):
         pfx = args.db_prefix + '_'
     else:
         pfx = ''
+    rc = psql(args, 'alter table sync_client_sync_server_connection ADD COLUMN IF NOT EXISTS ufload_automatic_patching_prod_value boolean;', db)
+    rc = psql(args, 'update sync_client_sync_server_connection set ufload_automatic_patching_prod_value=automatic_patching;', db)
     rc = psql(args, 'update sync_client_sync_server_connection set automatic_patching = \'f\', protocol = \'xmlrpc\', login = \'%s\', database = \'%s%s\', host = \'127.0.0.1\', port = %d;' % (adminuser, pfx, ss, port), db)
     if rc != 0:
         return rc
 
     # disable cron jobs
-    rc = psql(args, 'update ir_cron set active = \'f\' where model = \'backup.config\';', db)
+    rc = psql(args, "update ir_cron set active = 'f' where model in ('backup.config', 'unidata.sync');", db)
     if rc != 0:
         return rc
     rc = psql(args, 'update ir_cron set active = \'f\' where model = \'msf.instance.cloud\';', db)
@@ -705,9 +710,6 @@ def sync_server_all_sandbox_sync_user(args, db='SYNC_SERVER_LOCAL'):
     if args.connectionpw:
         _run_out(args, mkpsql(args, "update res_users set password ='%s' where id=805;" % args.connectionpw, db))
 
-def sync_server_settings(args, sync_server, db):
-    _run_out(args, mkpsql(args, 'update sync_client_sync_server_connection set database = \'%s\', login=\'%s\', user_id = 1;' % (sync_server, args.adminuser.lower()) , db))
-
 def connect_instance_to_sync_server(args, sync_server, db):
     #Temporary desactivation of auto-connect
     #return 0
@@ -898,8 +900,6 @@ def installUserRights(args, db='SYNC_SERVER_LOCAL'):
     sync_obj = netrpc.get('sync_server.user_rights.add_file')
     # netrpc.config['run_foreground'] = True
     ufload.progress("Download User Rights")
-    sync_ids = sync_obj.search([])
-    # result = sync_obj.import_zip(sync_ids, {'name': ur_name, 'zip_file': encodestring(plain_zip)})
 
     load_id = sync_obj.create( {'name': ur_name, 'zip_file': encodestring(plain_zip)})
     result = sync_obj.import_zip( [load_id], context)

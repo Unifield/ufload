@@ -130,8 +130,6 @@ def _cmdRestore(args):
         # Update instances sync settings
         for db in dbs:
             ufload._progress("Connection settings for %s" % db)
-            #Defines sync server connection settings on each instance
-            ufload.db.sync_server_settings(args, ss, db)
             if args.sync or args.autosync or args.synclight or args.ss is not None:
                 #Connects each instance to the sync server (and sets pwd)
                 ufload.db.connect_instance_to_sync_server(args, ss, db)
@@ -318,12 +316,6 @@ def _multiRestore(args):
             ufload.progress("File size: %s Mb" % filesize)
 
             n= ufload.cloud.peek_inside_local_file(j[0], filename)
-            '''n = ufload.cloud.peek_inside_file(j[0], j[1],
-                                           user=args.user,
-                                           pw=args.pw,
-                                           dav=dav,
-                                           where=_ocToDir(args.oc))
-            '''
             if n is None:
                 os.unlink(j[1])
                 # no dump inside of zip, try the next one
@@ -827,6 +819,7 @@ def parse():
     pRestore.add_argument("-connectionpw", default='Only4Sandbox', help="Password to connect instance to the sync server")
     pRestore.add_argument("-logo", dest='logo', help="path to the new company logo")
     pRestore.add_argument("-banner", dest='banner', help="text to display in the banner")
+    pRestore.add_argument("-jobs", dest='jobs', type=int, help="Number of concurrent pg_restore jobs")
     pRestore.set_defaults(func=_cmdRestore)
 
     pArchive = sub.add_parser('archive', help="Copy new data into the database.")

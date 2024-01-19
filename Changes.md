@@ -1,3 +1,9 @@
+# version 0.278
+
+* option -jobs for pg\_restore -j
+* disable UniData pull cron
+* store orginal value of sync\_client\_sync\_server\_connection.automatic\_patching in ufload\_automatic\_patching\_prod\_value column
+
 # version 0.276
 
 * replace deletegroups by hidegroups

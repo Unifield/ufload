@@ -1,10 +1,9 @@
 # Routines related to ownCloud
 
-import easywebdav
 import time
 import zipfile
 import collections
-import logging, tempfile
+import logging
 import base64
 import sys
 import webdav
@@ -232,33 +231,6 @@ def peek_inside_local_file(path, fn):
     del z
     return n
 
-
-def peek_inside_file(path, fn, **kwargs):
-    '''host, directory = _splitCloudName(kwargs['where'])
-    dav = easywebdav.connect(host,
-                            username=kwargs['user'],
-                            password=kwargs['pw'],
-                            protocol='https')
-    '''
-
-    try:
-        z = zipfile.ZipFile(ufload.httpfile.HttpFile(dav.baseurl+path,
-                                                     dav.session.auth[0],
-                                                     dav.session.auth[1]))
-    except Exception as e:
-        ufload.progress("Zipfile %s: could not read: %s" % (fn, e))
-        return None
-    
-    names = z.namelist()
-    if len(names) == 0:
-        ufload.progress("Zipfile %s has no files in it." % fn)
-        return None
-    if len(names) != 1:
-        ufload.progress("Zipfile %s has unexpected files in it: %s" % (fn, names))
-        return None
-    n = names[0]
-    z.close()
-    return n
 
 def dlProgress(pct):
     ufload.progress("Downloaded %d%%" % pct)
