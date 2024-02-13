@@ -706,9 +706,9 @@ def sync_server_all_admin(args, db='SYNC_SERVER_LOCAL'):
     _run_out(args, mkpsql(args, 'update sync_server_entity set user_id = 1;', db))
 
 def sync_server_all_sandbox_sync_user(args, db='SYNC_SERVER_LOCAL'):
-    _run_out(args, mkpsql(args, 'update sync_server_entity set user_id = 805;', db))
+    _run_out(args, mkpsql(args, "update sync_server_entity set user_id = (select id from res_users where login='%s';" % args.connectionuser, db))
     if args.connectionpw:
-        _run_out(args, mkpsql(args, "update res_users set password ='%s' where id=805;" % args.connectionpw, db))
+        _run_out(args, mkpsql(args, "update res_users set password ='%s' where login='%s';" % (args.connectionpw, args.connectionuser) , db))
 
 def connect_instance_to_sync_server(args, sync_server, db):
     #Temporary desactivation of auto-connect
