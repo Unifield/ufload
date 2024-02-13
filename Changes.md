@@ -1,3 +1,7 @@
+# version 0.280
+
+* restore option "-no-login" to no trigger upgrade
+
 # version 0.278
 
 * option -jobs for pg\_restore -j

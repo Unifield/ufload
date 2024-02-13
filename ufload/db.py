@@ -632,22 +632,6 @@ def cleanDbs(args):
 
     return nb
 
-def sync_link(args, hwid, db, sdb, all=False):
-    instance = _db_to_instance(args, db)
-    #Create the instance in the sync server if it does not already exist
-    rc = psql(args, 'insert into sync_server_entity (create_uid, create_date, write_date, write_uid, user_id, name, state) SELECT 1, now(), now(), 1, 1, \'%s\', \'validated\' FROM sync_server_entity WHERE NOT EXISTS (SELECT 1 FROM sync_server_entity WHERE name = \'%s\') ' % (instance, instance), sdb )
-
-    if rc != 0:
-        ufload.progress('Unable to create the instance %s on the sync server. Please add it manually.' % instance)
-        #return rc
-
-    if all:
-        # Update hardware id for every instance
-        return psql(args, 'update sync_server_entity set hardware_id = \'%s\';' % hwid, sdb)
-    else:
-        #Update hardware id for this instance
-        return psql(args, 'update sync_server_entity set hardware_id = \'%s\' where name = \'%s\';' % (hwid, instance), sdb)
-
 # Remove all databases which come from the same instance as db
 def clean(args, db):
     toClean = {}
@@ -706,7 +690,7 @@ def sync_server_all_admin(args, db='SYNC_SERVER_LOCAL'):
     _run_out(args, mkpsql(args, 'update sync_server_entity set user_id = 1;', db))
 
 def sync_server_all_sandbox_sync_user(args, db='SYNC_SERVER_LOCAL'):
-    _run_out(args, mkpsql(args, "update sync_server_entity set user_id = (select id from res_users where login='%s';" % args.connectionuser, db))
+    _run_out(args, mkpsql(args, "update sync_server_entity set user_id = (select id from res_users where login='%s');" % args.connectionuser, db))
     if args.connectionpw:
         _run_out(args, mkpsql(args, "update res_users set password ='%s' where login='%s';" % (args.connectionpw, args.connectionuser) , db))
 
@@ -716,6 +700,9 @@ def connect_instance_to_sync_server(args, sync_server, db):
 
     # if db.startswith('SYNC_SERVER'):
     #    return 0
+
+    if args.nologin:
+        return True
 
     port = 8069
     if args.sync_xmlrpcport:

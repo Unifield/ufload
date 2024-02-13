@@ -370,6 +370,19 @@ def _multiRestore(args):
             except Exception:
                 pass
 
+    if args.ss and not args.nologin:
+        # connect to trigger update if needed
+        if args.sync_xmlrpcport:
+            port = int(args.sync_xmlrpcport)
+        else:
+            port = 8069
+
+        try:
+            netrpc = oerplib.OERP('127.0.0.1', protocol='xmlrpc', port=port, timeout=1000, version='6.0')
+            netrpc.login(args.adminuser.lower(), args.adminpw, database=args.ss)
+        except:
+            ufload.progress("Unable to loggin on %s" % args.ss)
+
     if args.ss is not None and args.sync is None and args.synclight is None:
         _syncLink(args, dbs, args.ss)
 
@@ -450,17 +463,18 @@ def _syncLink(args, dbs, sdb):
 
     if args.ss and (args.sync is None and args.synclight is None):
         #We don't update hardware id for all local instances: instances from another server could be already connected
-        all = False
+        for db in dbs:
+            instance = ufload.db._db_to_instance(args, db)
+            if not db:
+                instance = db
+            ufload.progress("Updating hardware id and entity name for %s in sync server" % db)
+            ufload.db.psql(args, "update sync_server_entity set hardware_id = '%s' where name='%s';" % (hwid, instance), sdb)
+
     else:
         # We update hardware id for all local instances: it's a new sync server, so no instance is connected yet
-        all = True
         ufload.db.psql(args, 'update sync_server_entity set hardware_id = \'%s\';' % hwid, sdb)
 
-    for db in dbs:
-        ufload.progress("Updating hardware id and entity name for %s in sync server" % db)
-        rc = ufload.db.sync_link(args, hwid, db, sdb, all)   #Update hardware_id and entity name (of the instance) in sync server db
-        if rc != 0:
-            return rc
+
     return 0
 
 
@@ -820,6 +834,7 @@ def parse():
     pRestore.add_argument("-logo", dest='logo', help="path to the new company logo")
     pRestore.add_argument("-banner", dest='banner', help="text to display in the banner")
     pRestore.add_argument("-jobs", dest='jobs', type=int, help="Number of concurrent pg_restore jobs")
+    pRestore.add_argument("-no-login", dest='nologin', action='store_true', help="do not login to the instances, do not trigger upgrade")
     pRestore.set_defaults(func=_cmdRestore)
 
     pArchive = sub.add_parser('archive', help="Copy new data into the database.")
