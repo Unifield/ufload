@@ -450,23 +450,6 @@ def delive(args, db):
     if args.adminpw:
         rc = psql(args, 'update res_users set password = \'%s\' WHERE id = 1;' % args.adminpw, db)
 
-    if args.nopwreset:
-        ufload.progress("*** WARNING: The restored database has LIVE passwords.")
-        return 0
-
-    # set the username of the admin account
-    rc = psql(args, 'update res_users set login = \'%s\' where id = 1;' % adminuser, db)
-    if rc != 0:
-        return rc
-
-    # put the chosen password into all users
-    #rc = psql(args, 'update res_users set password = \'%s\';' % args.adminpw, db)
-    if rc != 0:
-        return rc
-
-    if args.inactiveusers:
-        rc = psql(args, "update res_users set active = 'f' where login not in ('synch', '%s');" % adminuser, db)
-
     if args.createusers:
         if args.adminpw != args.userspw:
             newpass = args.userspw
@@ -531,6 +514,24 @@ def delive(args, db):
                 rc = psql(args, " insert into res_groups_users_rel (uid, gid) (select %s, id from res_groups where name='%s');" % (new_userid, new_group), db)
                 if rc != 0:
                     return rc
+
+    if args.nopwreset:
+        ufload.progress("*** WARNING: The restored database has LIVE passwords.")
+        return 0
+
+    # set the username of the admin account
+    rc = psql(args, 'update res_users set login = \'%s\' where id = 1;' % adminuser, db)
+    if rc != 0:
+        return rc
+
+    # put the chosen password into all users
+    #rc = psql(args, 'update res_users set password = \'%s\';' % args.adminpw, db)
+    if rc != 0:
+        return rc
+
+    if args.inactiveusers:
+        rc = psql(args, "update res_users set active = 'f' where login not in ('synch', '%s');" % adminuser, db)
+
 
     # ok, delive finished with no problems
     return 0
