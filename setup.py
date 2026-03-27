@@ -29,7 +29,7 @@ def find_version(*file_paths):
 install_requires = [
     'pyOpenSSL==19.1.0',
     'ndg-httpsclient==0.5.1',
-    'pyasn1==0.4.8',
+    'pyasn1==0.6.3',
     'easywebdav==1.2.0',
     'oerplib==0.8.4',
     'pybase64==0.5.0',
